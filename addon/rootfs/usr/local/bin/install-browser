@@ -1,25 +1,5 @@
 #!/usr/bin/env bash
-# Install Chromium for Playwright browser testing (requires ~400MB disk + extra RAM).
-# Only run this on devices with 8GB+ RAM.
-set -euo pipefail
-
-echo "Installing Chromium for browser testing..."
-echo "This requires ~400MB of disk space and extra RAM at runtime."
-echo ""
-
-# Install system deps needed by Chromium
-apk add --no-cache \
-    chromium \
-    nss \
-    freetype \
-    harfbuzz \
-    ca-certificates \
-    ttf-freefont
-
-# Tell Playwright to use the system Chromium
-export PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH="$(which chromium-browser)"
-echo "export PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=$(which chromium-browser)" >> /etc/profile.d/ha-env.sh
-
-echo ""
-echo "Chromium installed. Browser testing is now available."
-echo "Claude can use Playwright to open your HA dashboards and verify changes."
+# Chromium is now pre-installed. This script is kept for backwards compatibility.
+echo "Chromium is already installed. Both Playwright and agent-browser are ready to use."
+echo "  PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=$PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"
+echo "  AGENT_BROWSER_EXECUTABLE_PATH=$AGENT_BROWSER_EXECUTABLE_PATH"
