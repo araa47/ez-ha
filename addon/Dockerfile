@@ -12,6 +12,7 @@ RUN apk add --no-cache \
         bash \
         curl \
         jq \
+        openvpn \
     # ttyd static binary
     && ARCH="$(uname -m)" \
     && curl -fsSL -o /usr/local/bin/ttyd \
@@ -35,5 +36,12 @@ RUN apk add --no-cache \
 
 # Copy rootfs overlay (init scripts, services, helpers)
 COPY rootfs/ /
+
+# Ensure all scripts are executable
+RUN chmod +x \
+    /etc/cont-init.d/01-vpn-setup.sh \
+    /etc/services.d/openvpn/run \
+    /etc/services.d/openvpn/finish \
+    /usr/local/bin/vpn-up.sh
 
 WORKDIR /config

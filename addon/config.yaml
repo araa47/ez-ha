@@ -1,6 +1,6 @@
 ---
-name: ez-ha Claude Agent
-version: 0.0.1
+name: ez-ha
+version: 0.0.2
 slug: ez-ha-agent
 description: AI coding agent with Claude Code — edit HA configs, debug automations, and test dashboards
 url: https://github.com/araa47/ez-ha
@@ -14,7 +14,7 @@ ingress: true
 ingress_port: 8099
 ingress_stream: true
 panel_icon: mdi:robot
-panel_title: Claude Agent
+panel_title: ez-ha
 map:
     - config:rw
     - ssl:ro
@@ -25,13 +25,23 @@ map:
 hassio_api: true
 homeassistant_api: true
 auth_api: true
+privileged:
+    - NET_ADMIN
 options:
     anthropic_api_key: ''
     ssh_host: ''
     ssh_port: 22
     ssh_username: root
+    expressvpn_enabled: false
+    expressvpn_username: ''
+    expressvpn_password: ''
+    expressvpn_config: ''
 schema:
     anthropic_api_key: str?
     ssh_host: str?
     ssh_port: port?
     ssh_username: str?
+    expressvpn_enabled: bool?
+    expressvpn_username: str?
+    expressvpn_password: str?
+    expressvpn_config: str?

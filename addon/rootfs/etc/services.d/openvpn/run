@@ -1,0 +1,21 @@
+#!/usr/bin/with-contenv bashio
+# Start OpenVPN for ExpressVPN — only if setup completed successfully
+
+if [ ! -f /run/openvpn/config_path ]; then
+    bashio::log.info "OpenVPN not configured — service sleeping"
+    exec sleep infinity
+fi
+
+ovpn_file=$(cat /run/openvpn/config_path)
+
+bashio::log.info "Starting OpenVPN with ${ovpn_file}"
+
+exec openvpn \
+    --config "$ovpn_file" \
+    --auth-user-pass /run/openvpn/auth.txt \
+    --auth-nocache \
+    --pull-filter ignore "route-ipv6" \
+    --pull-filter ignore "ifconfig-ipv6" \
+    --script-security 2 \
+    --up /usr/local/bin/vpn-up.sh \
+    --verb 3
