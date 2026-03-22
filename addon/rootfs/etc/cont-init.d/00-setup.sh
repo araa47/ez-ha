@@ -17,7 +17,7 @@ ln -sf /data/claude-config /root/.claude
 # Build /etc/profile.d/ha-env.sh (overwrite each start — do NOT append)
 # ---------------------------------------------------------------------------
 cat > /etc/profile.d/ha-env.sh <<ENVEOF
-export HA_URL=http://homeassistant:8123
+export HA_URL=http://supervisor/core
 export HA_TOKEN=${SUPERVISOR_TOKEN}
 export SUPERVISOR_TOKEN=${SUPERVISOR_TOKEN}
 export IS_SANDBOX=1
@@ -67,6 +67,19 @@ export HA_SSH_PORT=${ssh_port}
 export HA_SSH_USER=${ssh_user}
 alias ssh-ha='ssh -o StrictHostKeyChecking=no -p ${ssh_port} ${ssh_user}@${ssh_host}'
 SSHEOF
+fi
+
+# Browser profile — persist HA login session across restarts
+echo "export AGENT_BROWSER_PROFILE=/data/browser-profile" >> /etc/profile.d/ha-env.sh
+
+# HA browser credentials (optional — for auto-login to HA frontend)
+ha_user=$(bashio::config 'ha_username' '')
+ha_pass=$(bashio::config 'ha_password' '')
+if [ -n "$ha_user" ] && [ -n "$ha_pass" ]; then
+    cat >> /etc/profile.d/ha-env.sh <<BROWSEREOF
+export HA_BROWSER_USER=${ha_user}
+export HA_BROWSER_PASS=${ha_pass}
+BROWSEREOF
 fi
 
 # cc alias — claude with no permission prompts

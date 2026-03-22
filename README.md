@@ -5,7 +5,7 @@
   </p>
   <p align="center">
     <a href="#ez-ha--the-skill">Skill</a> &bull;
-    <a href="#ez-ha--the-addon-beta">Addon</a> &bull;
+    <a href="#ez-ha--the-addon">Addon</a> &bull;
     <a href="https://github.com/araa47/ez-ha/issues">Issues</a> &bull;
     <a href="CONTRIBUTING.md">Contributing</a>
   </p>
@@ -23,10 +23,9 @@
 | | **The Skill** | **The Addon** |
 |:--|:--|:--|
 | **What** | CLI that lets any AI agent control your HA | Full Claude Code environment running inside HAOS |
-| **Where** | Your laptop / server, alongside your agent | Home Assistant sidebar via web terminal |
-| **For** | Adding HA superpowers to Claude Code, Cursor, Codex, etc. | Editing configs, debugging, and testing directly in HA |
+| **Where** | Your laptop / server — give agents remote access to your HA | Home Assistant sidebar via web terminal |
+| **For** | Adding HA superpowers to Claude Code, Cursor, Codex, etc. from anywhere | Editing configs, debugging, and testing directly in HA |
 | **Install** | `npx skills add araa47/ez-ha` | Add repo URL in HA addon store |
-| **Status** | Stable | **BETA** |
 
 ---
 
@@ -73,12 +72,9 @@ ha cover close cover.bedroom_blinds
 
 ---
 
-## ez-ha -- The Addon *(BETA)*
+## ez-ha -- The Addon
 
 > A Home Assistant addon that runs **Claude Code** directly inside HAOS -- full config access, Supervisor API, and a web terminal in your sidebar.
-
-> [!WARNING]
-> This addon is under active development. Expect rough edges. [Report issues here.](https://github.com/araa47/ez-ha/issues)
 
 ### Highlights
 
@@ -110,6 +106,8 @@ ha cover close cover.bedroom_blinds
 | Option | Description |
 |:-------|:------------|
 | `anthropic_api_key` | Anthropic API key *(or run `claude auth` in the terminal)* |
+| `ha_username` | HA user for browser access *(optional — create a user without 2FA)* |
+| `ha_password` | HA password for browser access *(optional)* |
 | `ssh_host` | IP / hostname to SSH into the HA host *(optional)* |
 | `ssh_port` | SSH port *(default: 22)* |
 | `ssh_username` | SSH user *(default: root)* |
@@ -127,7 +125,8 @@ ha-supervisor check                   # validate YAML config
 ha-supervisor reload automations      # reload without restart
 ha-supervisor restart                 # full HA restart
 ha-supervisor logs 50                 # tail core logs
-agent-browser                         # browser automation (Chrome pre-installed)
+browser-login                         # authenticate browser for HA UI access
+agent-browser                         # browser automation (Chromium pre-installed)
 ssh-ha                                # SSH to host (if configured)
 cc                                    # claude --dangerously-skip-permissions
 curl -s https://ipinfo.io             # verify VPN country (if enabled)

@@ -52,6 +52,7 @@ RUN chmod +x \
     /etc/cont-init.d/01-vpn-setup.sh \
     /etc/services.d/openvpn/run \
     /etc/services.d/openvpn/finish \
-    /usr/local/bin/vpn-up.sh
+    /usr/local/bin/vpn-up.sh \
+    /usr/local/bin/browser-login
 
 WORKDIR /config
