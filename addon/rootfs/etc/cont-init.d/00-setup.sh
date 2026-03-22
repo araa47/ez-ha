@@ -100,4 +100,11 @@ if [ ! -f /config/CLAUDE.md ]; then
     cp /root/CLAUDE.md /config/CLAUDE.md
 fi
 
+# ---------------------------------------------------------------------------
+# Zsh setup: persistent history, default shell
+# ---------------------------------------------------------------------------
+touch /data/zsh_history
+# Set zsh as root's default shell (for tmux and any direct login)
+sed -i 's|^root:.*:/bin/ash$|root:x:0:0:root:/root:/bin/zsh|' /etc/passwd 2>/dev/null || true
+
 bashio::log.info "ez-ha Claude Agent setup complete"

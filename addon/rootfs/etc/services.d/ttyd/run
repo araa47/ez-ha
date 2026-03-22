@@ -1,11 +1,11 @@
 #!/usr/bin/with-contenv bashio
-# Start ttyd → tmux session on the ingress port
+# Start ttyd → zsh in tmux session on the ingress port
 # shellcheck disable=SC1091
 . /etc/profile.d/ha-env.sh
 
 exec ttyd \
     -p 8099 \
     -t fontSize=14 \
-    -t 'theme={"background":"#1e1e2e","foreground":"#cdd6f4"}' \
+    -t 'theme={"background":"#1e1e2e","foreground":"#cdd6f4","cursor":"#f5e0dc","selectionBackground":"#585b70","black":"#45475a","red":"#f38ba8","green":"#a6e3a1","yellow":"#f9e2af","blue":"#89b4fa","magenta":"#f5c2e7","cyan":"#94e2d5","white":"#bac2de"}' \
     -W \
-    tmux new-session -A -s main -c /root
+    tmux new-session -A -s main -c /root "exec zsh"

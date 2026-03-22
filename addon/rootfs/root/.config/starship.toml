@@ -1,0 +1,87 @@
+# Starship prompt — adapted from rex's dotfiles for ez-ha container
+# Format: container icon, dir, git, langs, cmd_duration, then prompt char
+format = """$hostname$directory$git_branch$git_status$docker_context$nodejs$python$rust$golang$cmd_duration$fill
+$character"""
+
+add_newline = true
+command_timeout = 1000
+
+[character]
+success_symbol = "[❯](bold green)"
+error_symbol = "[❯](bold red)"
+vimcmd_symbol = "[❮](bold green)"
+
+[hostname]
+ssh_only = false
+format = "[🏠 ez-ha]($style) "
+style = "bold blue"
+
+[directory]
+truncation_length = 3
+truncate_to_repo = true
+style = "bold cyan"
+
+[git_branch]
+symbol = "🍴 "
+style = "bold purple"
+format = "[$symbol$branch]($style) "
+
+[git_status]
+disabled = true
+
+[docker_context]
+symbol = "🐳 "
+style = "bold blue"
+format = "[$symbol$context]($style) "
+only_with_files = true
+
+[nodejs]
+symbol = "⬢ "
+format = "[$symbol$version]($style) "
+style = "bold green"
+detect_files = ["package.json"]
+detect_folders = ["node_modules"]
+
+[python]
+symbol = "🐍 "
+format = "[$symbol$version]($style) "
+style = "bold yellow"
+detect_files = ["pyproject.toml", "requirements.txt", "setup.py"]
+
+[rust]
+symbol = "🦀 "
+format = "[$symbol$version]($style) "
+style = "bold red"
+detect_files = ["Cargo.toml"]
+
+[golang]
+symbol = "🐹 "
+format = "[$symbol$version]($style) "
+style = "bold cyan"
+detect_files = ["go.mod"]
+
+[fill]
+symbol = " "
+
+[cmd_duration]
+min_time = 2000
+format = "took [$duration]($style) "
+style = "bold yellow"
+
+[package]
+disabled = true
+
+[battery]
+disabled = true
+
+[os]
+disabled = true
+
+[username]
+show_always = false
+format = "[$user]($style) "
+style_user = "bold dimmed blue"
+style_root = "bold red"
+
+[kubernetes]
+disabled = true

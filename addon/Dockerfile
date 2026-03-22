@@ -10,6 +10,7 @@ RUN apk add --no-cache \
         tmux \
         openssh-client \
         bash \
+        zsh \
         curl \
         jq \
         openvpn \
@@ -19,11 +20,27 @@ RUN apk add --no-cache \
         harfbuzz \
         ca-certificates \
         ttf-freefont \
+        # Terminal enhancements
+        fzf \
+        eza \
+        zsh-autosuggestions \
+        zsh-syntax-highlighting \
     # ttyd static binary
     && ARCH="$(uname -m)" \
     && curl -fsSL -o /usr/local/bin/ttyd \
        "https://github.com/tsl0922/ttyd/releases/download/1.7.7/ttyd.${ARCH}" \
     && chmod +x /usr/local/bin/ttyd \
+    # Starship prompt (static binary)
+    && ARCH="$(uname -m)" \
+    && if [ "$ARCH" = "x86_64" ]; then STARSHIP_ARCH="x86_64-unknown-linux-musl"; \
+       elif [ "$ARCH" = "aarch64" ]; then STARSHIP_ARCH="aarch64-unknown-linux-musl"; fi \
+    && curl -fsSL "https://github.com/starship/starship/releases/latest/download/starship-${STARSHIP_ARCH}.tar.gz" \
+       | tar xz -C /usr/local/bin \
+    && chmod +x /usr/local/bin/starship \
+    # zsh-history-substring-search plugin (not in Alpine repos)
+    && mkdir -p /usr/share/zsh/plugins/zsh-history-substring-search \
+    && curl -fsSL "https://raw.githubusercontent.com/zsh-users/zsh-history-substring-search/master/zsh-history-substring-search.zsh" \
+       -o /usr/share/zsh/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh \
     # Claude Code CLI + Playwright + agent-browser (use Alpine chromium, not Chrome for Testing)
     && npm install -g @anthropic-ai/claude-code playwright agent-browser \
     && npm cache clean --force \
