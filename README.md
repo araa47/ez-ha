@@ -14,7 +14,7 @@
 
 ---
 
-## Part 1 — The ez-ha Skill
+## ez-ha — The Skill
 
 Give your agent the ability to talk to Home Assistant — query entities, call services, check automations, and debug issues. Works with any agent that supports skills (Claude Code, OpenClaw, Cursor, Codex, etc.).
 
@@ -53,7 +53,7 @@ ha cover close cover.bedroom_blinds
 
 ---
 
-## Part 2 — The ez-ha Home Assistant Addon (BETA)
+## ez-ha — The Home Assistant Addon (BETA)
 
 A Home Assistant addon that runs Claude Code directly inside your HAOS instance — with full config file access, Supervisor API control, and a web terminal in your sidebar.
 
