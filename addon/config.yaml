@@ -1,6 +1,6 @@
 ---
 name: ez-ha Claude Agent
-version: 0.1.0
+version: 0.0.1
 slug: ez-ha-agent
 description: AI coding agent with Claude Code — edit HA configs, debug automations, and test dashboards
 url: https://github.com/araa47/ez-ha

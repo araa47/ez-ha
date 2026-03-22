@@ -34,6 +34,11 @@ If the user set up SSH in addon options, connect with:
 ssh-ha        # Alias for SSH to HA host
 ```
 
+### Browser Testing (optional — requires `install-browser` first)
+Playwright is pre-installed but the browser binary is not (to save space).
+To enable browser testing, run `install-browser` in the terminal (needs ~400MB disk, 8GB+ RAM recommended).
+Once installed, you can open HA dashboards and verify changes visually.
+
 ## File Locations
 
 - `/config/configuration.yaml` — Main HA config

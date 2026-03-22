@@ -10,23 +10,19 @@ if [ ! -d /root/.claude ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# HA environment for the ez-ha skill
+# Build /etc/profile.d/ha-env.sh (overwrite each start — do NOT append)
 # ---------------------------------------------------------------------------
-{
-    echo "export HA_URL=http://homeassistant:8123"
-    echo "export HA_TOKEN=${SUPERVISOR_TOKEN}"
-} >> /etc/profile.d/ha-env.sh
+cat > /etc/profile.d/ha-env.sh <<ENVEOF
+export HA_URL=http://homeassistant:8123
+export HA_TOKEN=${SUPERVISOR_TOKEN}
+export SUPERVISOR_TOKEN=${SUPERVISOR_TOKEN}
+ENVEOF
 
 # Anthropic API key (from addon options)
 api_key=$(bashio::config 'anthropic_api_key' '')
 if [ -n "$api_key" ]; then
     echo "export ANTHROPIC_API_KEY=${api_key}" >> /etc/profile.d/ha-env.sh
 fi
-
-# Supervisor token for ha-supervisor helper
-echo "export SUPERVISOR_TOKEN=${SUPERVISOR_TOKEN}" >> /etc/profile.d/ha-env.sh
-
-chmod +x /etc/profile.d/ha-env.sh
 
 # ---------------------------------------------------------------------------
 # SSH setup (optional — only if user configured ssh_host)
@@ -49,14 +45,15 @@ if [ -n "$ssh_host" ]; then
         chmod 600 /root/.ssh/id_ed25519
     fi
 
-    # Convenience alias
-    {
-        echo "export SSH_HOST=${ssh_host}"
-        echo "export SSH_PORT=${ssh_port}"
-        echo "export SSH_USER=${ssh_user}"
-        echo "alias ssh-ha='ssh -o StrictHostKeyChecking=no -p ${ssh_port} ${ssh_user}@${ssh_host}'"
-    } >> /etc/profile.d/ha-env.sh
+    cat >> /etc/profile.d/ha-env.sh <<SSHEOF
+export SSH_HOST=${ssh_host}
+export SSH_PORT=${ssh_port}
+export SSH_USER=${ssh_user}
+alias ssh-ha='ssh -o StrictHostKeyChecking=no -p ${ssh_port} ${ssh_user}@${ssh_host}'
+SSHEOF
 fi
+
+chmod +x /etc/profile.d/ha-env.sh
 
 # ---------------------------------------------------------------------------
 # Copy CLAUDE.md into /config if not already there

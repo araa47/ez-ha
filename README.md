@@ -4,15 +4,19 @@
 
 `ez-ha` is two things in one repo:
 
-1. **An agent skill** — gives any AI agent (OpenClaw, Claude, Codex, Cursor, ...) the ability to query and control your Home Assistant instance
-
-2. **A Home Assistant addon** — runs a full AI coding agent inside HAOS with file access, shell, and a browser to view and validate your dashboards end-to-end
+| | ez-ha Skill | ez-ha Addon |
+|---|---|---|
+| **What** | CLI tool that lets any AI agent control your HA | Full Claude Code environment running inside HAOS |
+| **Where** | Runs on your laptop/server alongside your agent | Runs as a Home Assistant addon with sidebar access |
+| **For** | Adding HA control to Claude Code, Cursor, Codex, etc. | Editing HA configs, debugging, and testing directly in HA |
+| **Install** | `npx skills add araa47/ez-ha` | Add repo in HA addon store |
+| **Status** | Stable | **BETA** |
 
 ---
 
-## Part 1 — Add the HA Skill to Your Agent
+## Part 1 — The ez-ha Skill
 
-Give your agent the ability to talk to Home Assistant — query entities, call services, check automations, and debug issues.
+Give your agent the ability to talk to Home Assistant — query entities, call services, check automations, and debug issues. Works with any agent that supports skills (Claude Code, OpenClaw, Cursor, Codex, etc.).
 
 ```bash
 npx skills add araa47/ez-ha
@@ -49,9 +53,11 @@ ha cover close cover.bedroom_blinds
 
 ---
 
-## Part 2 — The ez-ha Home Assistant Addon
+## Part 2 — The ez-ha Home Assistant Addon (BETA)
 
 A Home Assistant addon that runs Claude Code directly inside your HAOS instance — with full config file access, Supervisor API control, and a web terminal in your sidebar.
+
+> **BETA:** This addon is under active development. Expect rough edges. Please report issues on GitHub.
 
 ### What it does
 
@@ -60,19 +66,19 @@ A Home Assistant addon that runs Claude Code directly inside your HAOS instance 
 - **Full read/write access** to your HA config files (`/config/`)
 - **`ha` CLI built-in** — the same ez-ha skill, pre-configured with your HA instance
 - **`ha-supervisor` helper** — restart HA, validate configs, reload automations, view logs
+- **Playwright** pre-installed — run `install-browser` on 8GB+ devices for visual dashboard testing
 - **Optional SSH** — connect to the HA host for advanced debugging
-- **Optional browser testing** — install Playwright on devices with 8GB+ RAM
 
 ### Install
 
-1. Go to **Settings → Add-ons → Add-on Store**
-2. Click **...** → **Repositories** → add:
+1. Go to **Settings -> Add-ons -> Add-on Store**
+2. Click **...** -> **Repositories** -> add:
    ```
    https://github.com/araa47/ez-ha
    ```
 3. Find **ez-ha Claude Agent** in the store and install
 4. (Optional) Set your Anthropic API key in the **Configuration** tab
-5. Start the addon → open **Claude Agent** from the sidebar
+5. Start the addon -> open **Claude Agent** from the sidebar
 6. Run `claude` in the terminal to start
 
 ### Configuration
@@ -93,4 +99,5 @@ A Home Assistant addon that runs Claude Code directly inside your HAOS instance 
 - Query and control devices via `ha search`, `ha light on`, etc.
 - View HA core logs with `ha-supervisor logs`
 - Debug why an automation isn't triggering
+- Open your HA dashboard in a headless browser to visually verify changes (after `install-browser`)
 - SSH to the host for advanced operations (if configured)
