@@ -35,23 +35,37 @@ if [ -n "$ssh_host" ]; then
     mkdir -p /root/.ssh
     chmod 700 /root/.ssh
 
-    # If user placed a key in /config/.ssh/, use it
+    # Generate SSH key pair if none exists (persisted in /config/.ssh/)
+    mkdir -p /config/.ssh
+    if [ ! -f /config/.ssh/id_ed25519 ]; then
+        ssh-keygen -t ed25519 -f /config/.ssh/id_ed25519 -N "" -C "ez-ha-addon"
+        bashio::log.info "Generated SSH key pair. Add this public key to your SSH addon's authorized_keys:"
+        bashio::log.info "$(cat /config/.ssh/id_ed25519.pub)"
+    fi
+
+    # Copy key into container
+    cp /config/.ssh/id_ed25519 /root/.ssh/id_ed25519
+    chmod 600 /root/.ssh/id_ed25519
+    if [ -f /config/.ssh/id_ed25519.pub ]; then
+        cp /config/.ssh/id_ed25519.pub /root/.ssh/id_ed25519.pub
+    fi
+
+    # Also support user-provided RSA key
     if [ -f /config/.ssh/id_rsa ]; then
         cp /config/.ssh/id_rsa /root/.ssh/id_rsa
         chmod 600 /root/.ssh/id_rsa
     fi
-    if [ -f /config/.ssh/id_ed25519 ]; then
-        cp /config/.ssh/id_ed25519 /root/.ssh/id_ed25519
-        chmod 600 /root/.ssh/id_ed25519
-    fi
 
     cat >> /etc/profile.d/ha-env.sh <<SSHEOF
-export SSH_HOST=${ssh_host}
-export SSH_PORT=${ssh_port}
-export SSH_USER=${ssh_user}
+export HA_SSH_HOST=${ssh_host}
+export HA_SSH_PORT=${ssh_port}
+export HA_SSH_USER=${ssh_user}
 alias ssh-ha='ssh -o StrictHostKeyChecking=no -p ${ssh_port} ${ssh_user}@${ssh_host}'
 SSHEOF
 fi
+
+# cc alias — claude with no permission prompts
+echo "alias cc='claude --dangerously-skip-permissions'" >> /etc/profile.d/ha-env.sh
 
 chmod +x /etc/profile.d/ha-env.sh
 

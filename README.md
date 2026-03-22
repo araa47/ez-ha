@@ -89,8 +89,9 @@ ha cover close cover.bedroom_blinds
 | **Config access** | Full read/write to `/config/` -- automations, scripts, scenes, custom components |
 | **`ha` CLI** | The same ez-ha skill, auto-configured with your HA credentials |
 | **`ha-supervisor`** | Restart HA, validate configs, reload automations, view logs |
-| **Browser testing** | Playwright pre-installed -- run `install-browser` on 8 GB+ devices |
-| **SSH** | Optional direct host access for advanced debugging |
+| **Browser testing** | agent-browser + Chrome for Testing pre-installed |
+| **SSH** | Auto-generated key pair, optional direct host access for advanced debugging |
+| **`cc` alias** | `claude --dangerously-skip-permissions` for fully autonomous operation |
 
 ### Install
 
@@ -126,8 +127,9 @@ ha-supervisor check                   # validate YAML config
 ha-supervisor reload automations      # reload without restart
 ha-supervisor restart                 # full HA restart
 ha-supervisor logs 50                 # tail core logs
-install-browser                       # enable Playwright (8 GB+ RAM)
+agent-browser                         # browser automation (Chrome pre-installed)
 ssh-ha                                # SSH to host (if configured)
+cc                                    # claude --dangerously-skip-permissions
 curl -s https://ipinfo.io             # verify VPN country (if enabled)
 ```
 

@@ -18,8 +18,9 @@ RUN apk add --no-cache \
     && curl -fsSL -o /usr/local/bin/ttyd \
        "https://github.com/tsl0922/ttyd/releases/download/1.7.7/ttyd.${ARCH}" \
     && chmod +x /usr/local/bin/ttyd \
-    # Claude Code CLI + Playwright library (no browser binary yet)
-    && npm install -g @anthropic-ai/claude-code playwright \
+    # Claude Code CLI + Playwright + agent-browser
+    && npm install -g @anthropic-ai/claude-code playwright agent-browser \
+    && agent-browser install \
     && npm cache clean --force \
     # Python deps for ha skill — install via pip then remove pip
     && apk add --no-cache --virtual .pip py3-pip \
