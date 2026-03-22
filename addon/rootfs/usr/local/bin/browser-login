@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# Log into the Home Assistant frontend via agent-browser.
+# Persists session in /data/browser-profile so subsequent agent-browser
+# calls are already authenticated.
+#
+# Usage:
+#   browser-login                    # uses HA_BROWSER_USER / HA_BROWSER_PASS env vars
+#   browser-login <username> <pass>  # explicit credentials
+set -euo pipefail
+
+USER="${1:-${HA_BROWSER_USER:-}}"
+PASS="${2:-${HA_BROWSER_PASS:-}}"
+
+if [ -z "$USER" ] || [ -z "$PASS" ]; then
+    echo "Usage: browser-login <username> <password>"
+    echo "  Or set HA_BROWSER_USER and HA_BROWSER_PASS env vars."
+    echo ""
+    echo "Tip: Create a dedicated HA user without 2FA for the agent."
+    exit 1
+fi
+
+PROFILE="/data/browser-profile"
+HA="http://homeassistant:8123"
+
+echo "Logging into Home Assistant at $HA ..."
+
+# Open the login page
+agent-browser --profile "$PROFILE" open "$HA" 2>/dev/null
+
+# Wait for the login form to load
+sleep 2
+agent-browser --profile "$PROFILE" wait "input[name='username']" 2>/dev/null || \
+    agent-browser --profile "$PROFILE" wait "input[type='text']" 2>/dev/null || true
+sleep 1
+
+# Fill in credentials and submit
+agent-browser --profile "$PROFILE" eval "
+    const root = document.querySelector('home-assistant').shadowRoot
+        .querySelector('ha-authorize').shadowRoot
+        .querySelector('ha-auth-flow').shadowRoot;
+    const form = root.querySelector('ha-local-auth-flow').shadowRoot;
+    const userInput = form.querySelector('ha-textfield[name=\"username\"] input') ||
+                      form.querySelector('input[name=\"username\"]') ||
+                      form.querySelector('ha-textfield input');
+    const passInput = form.querySelector('ha-password-field input') ||
+                      form.querySelector('input[type=\"password\"]');
+    if (userInput) { userInput.value = '${USER}'; userInput.dispatchEvent(new Event('input', {bubbles: true})); }
+    if (passInput) { passInput.value = '${PASS}'; passInput.dispatchEvent(new Event('input', {bubbles: true})); }
+    'filled'
+" 2>/dev/null
+
+sleep 1
+
+# Click the login button
+agent-browser --profile "$PROFILE" eval "
+    const root = document.querySelector('home-assistant').shadowRoot
+        .querySelector('ha-authorize').shadowRoot
+        .querySelector('ha-auth-flow').shadowRoot
+        .querySelector('ha-local-auth-flow').shadowRoot;
+    const btn = root.querySelector('ha-button[type=\"submit\"]') ||
+                root.querySelector('mwc-button') ||
+                root.querySelector('button[type=\"submit\"]');
+    if (btn) btn.click();
+    'clicked'
+" 2>/dev/null
+
+# Wait for redirect to dashboard
+sleep 3
+
+# Verify login succeeded
+CURRENT_URL=$(agent-browser --profile "$PROFILE" get url 2>/dev/null || echo "unknown")
+if echo "$CURRENT_URL" | grep -q "auth/authorize"; then
+    echo "Login may have failed (still on auth page). Check credentials or 2FA settings."
+    echo "Current URL: $CURRENT_URL"
+    echo ""
+    echo "If you have 2FA enabled, create a dedicated HA user without 2FA for the agent."
+    exit 1
+fi
+
+echo "Logged in successfully."
+echo "Browser profile saved to $PROFILE"
+echo "All agent-browser commands will use this session automatically."

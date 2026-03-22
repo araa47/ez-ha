@@ -23,21 +23,31 @@ The `HA_URL` env var is set automatically inside the addon.
 
 ## Authentication
 
-API requests use the `HA_TOKEN` (long-lived access token). For browser-based access, you may need to log in via the UI or use an auth token in the URL:
+API requests use `HA_TOKEN` (set automatically inside the addon).
 
+For browser-based access, run `browser-login` first to authenticate the browser session:
+
+```bash
+browser-login                   # Uses HA_BROWSER_USER / HA_BROWSER_PASS from addon config
+browser-login <user> <pass>     # Or pass credentials explicitly
 ```
-http://homeassistant:8123/auth/authorize?response_type=code&client_id=http://homeassistant:8123
-```
 
-## Browser testing with Playwright
+The session is persisted in `/data/browser-profile` via `AGENT_BROWSER_PROFILE` env var.
 
-If Playwright + Chromium are installed (run `install-browser` inside the addon):
+> **Tip:** Create a dedicated HA user without 2FA for the agent.
+
+## Browser testing with agent-browser
 
 ```bash
 # Take a screenshot of a dashboard
-npx playwright screenshot http://homeassistant:8123/lovelace/default_view screenshot.png
+agent-browser screenshot http://homeassistant:8123/lovelace/0 dashboard.png
 
-# Or use the agent-browser skill for interactive browser automation
+# Get the accessibility tree (for AI navigation)
+agent-browser open http://homeassistant:8123/lovelace/0 && agent-browser snapshot -i
+
+# Click elements, fill forms, etc.
+agent-browser click @e5
+agent-browser fill @e3 "Living Room"
 ```
 
 ## Key UI paths

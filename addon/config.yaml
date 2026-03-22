@@ -29,6 +29,8 @@ privileged:
     - NET_ADMIN
 options:
     anthropic_api_key: ''
+    ha_username: ''
+    ha_password: ''
     ssh_host: ''
     ssh_port: 22
     ssh_username: root
@@ -38,6 +40,8 @@ options:
     expressvpn_config: ''
 schema:
     anthropic_api_key: str?
+    ha_username: str?
+    ha_password: str?
     ssh_host: str?
     ssh_port: port?
     ssh_username: str?

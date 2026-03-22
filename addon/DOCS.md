@@ -24,6 +24,8 @@ This addon runs a web terminal (via ttyd + tmux) accessible from your HA sidebar
 | Option | Description |
 |--------|-------------|
 | `anthropic_api_key` | Your Anthropic API key (optional — you can also auth inside the terminal) |
+| `ha_username` | HA user for browser access (optional — for dashboard screenshots/testing) |
+| `ha_password` | HA password for browser access (optional) |
 | `ssh_host` | IP/hostname to SSH into (optional — for direct host access) |
 | `ssh_port` | SSH port (default: 22) |
 | `ssh_username` | SSH user (default: root) |
@@ -76,7 +78,20 @@ You should see the VPN server's IP and country.
 
 ## Browser testing
 
-`agent-browser` and Chrome for Testing are pre-installed. Claude can open your HA dashboard in a headless browser, take screenshots, and verify changes visually.
+Chromium and `agent-browser` are pre-installed. Claude can open your HA dashboard in a headless browser, take screenshots, and verify changes visually.
+
+### Browser login
+
+The HA frontend requires authentication. To let the agent access dashboards:
+
+1. **Recommended:** Create a dedicated HA user for the agent (Settings > People > Add Person) **without 2FA**
+2. Set `ha_username` and `ha_password` in this addon's Configuration tab
+3. Restart the addon
+4. Run `browser-login` in the terminal (or the agent can run it automatically)
+
+The browser session is persisted in `/data/browser-profile` and survives addon restarts.
+
+> **Note:** If the HA user has 2FA enabled, `browser-login` cannot complete the login flow automatically. Create a separate user without 2FA for the agent.
 
 ## `cc` alias
 

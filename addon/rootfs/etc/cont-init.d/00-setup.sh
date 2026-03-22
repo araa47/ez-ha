@@ -69,6 +69,19 @@ alias ssh-ha='ssh -o StrictHostKeyChecking=no -p ${ssh_port} ${ssh_user}@${ssh_h
 SSHEOF
 fi
 
+# Browser profile — persist HA login session across restarts
+echo "export AGENT_BROWSER_PROFILE=/data/browser-profile" >> /etc/profile.d/ha-env.sh
+
+# HA browser credentials (optional — for auto-login to HA frontend)
+ha_user=$(bashio::config 'ha_username' '')
+ha_pass=$(bashio::config 'ha_password' '')
+if [ -n "$ha_user" ] && [ -n "$ha_pass" ]; then
+    cat >> /etc/profile.d/ha-env.sh <<BROWSEREOF
+export HA_BROWSER_USER=${ha_user}
+export HA_BROWSER_PASS=${ha_pass}
+BROWSEREOF
+fi
+
 # cc alias — claude with no permission prompts
 echo "alias cc='claude --dangerously-skip-permissions'" >> /etc/profile.d/ha-env.sh
 

@@ -35,7 +35,14 @@ ssh-ha        # Alias for SSH to HA host
 ```
 
 ### `agent-browser` — Browser automation
-Chrome for Testing is pre-installed. Use `agent-browser` to navigate the HA UI, take screenshots, fill forms, and verify dashboard changes visually.
+Chromium is pre-installed. Use `agent-browser` to navigate the HA UI, take screenshots, fill forms, and verify dashboard changes visually.
+
+Before accessing HA dashboards, run `browser-login` to authenticate (uses `HA_BROWSER_USER` / `HA_BROWSER_PASS` env vars, or pass credentials as arguments). The session is persisted automatically.
+```bash
+browser-login                   # Uses env vars from addon config
+browser-login <user> <pass>     # Explicit credentials
+agent-browser screenshot http://homeassistant:8123/lovelace/0 dashboard.png
+```
 
 ### `cc` — Claude without permission prompts
 ```bash
