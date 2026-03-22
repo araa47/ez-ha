@@ -1,81 +1,137 @@
-# ez-ha
-
-**Home Assistant, meet your AI agent.**
-
-`ez-ha` is two things in one repo:
-
-1. **An agent skill** — gives any AI agent (OpenClaw, Claude, Codex, Cursor, ...) the ability to query and control your Home Assistant instance
-
-2. **A Home Assistant addon** — runs a full AI coding agent inside HAOS with file access, shell, and a browser to view and validate your dashboards end-to-end
+<p align="center">
+  <h1 align="center">ez-ha</h1>
+  <p align="center">
+    <strong>Home Assistant, meet your AI agent.</strong>
+  </p>
+  <p align="center">
+    <a href="#ez-ha--the-skill">Skill</a> &bull;
+    <a href="#ez-ha--the-addon-beta">Addon</a> &bull;
+    <a href="https://github.com/araa47/ez-ha/issues">Issues</a> &bull;
+    <a href="CONTRIBUTING.md">Contributing</a>
+  </p>
+  <p align="center">
+    <a href="https://github.com/araa47/ez-ha/actions"><img src="https://img.shields.io/github/actions/workflow/status/araa47/ez-ha/on-pr.yml?branch=main&style=flat-square" alt="CI"></a>
+    <a href="https://github.com/araa47/ez-ha/blob/main/LICENSE"><img src="https://img.shields.io/github/license/araa47/ez-ha?style=flat-square" alt="License"></a>
+    <a href="https://github.com/araa47/ez-ha/stargazers"><img src="https://img.shields.io/github/stars/araa47/ez-ha?style=flat-square" alt="Stars"></a>
+  </p>
+</p>
 
 ---
 
-## Part 1 — Add the HA Skill to Your Agent
+`ez-ha` is two things in one repo:
 
-Give your agent the ability to talk to Home Assistant — query entities, call services, check automations, and debug issues.
+| | **The Skill** | **The Addon** |
+|:--|:--|:--|
+| **What** | CLI that lets any AI agent control your HA | Full Claude Code environment running inside HAOS |
+| **Where** | Your laptop / server, alongside your agent | Home Assistant sidebar via web terminal |
+| **For** | Adding HA superpowers to Claude Code, Cursor, Codex, etc. | Editing configs, debugging, and testing directly in HA |
+| **Install** | `npx skills add araa47/ez-ha` | Add repo URL in HA addon store |
+| **Status** | Stable | **BETA** |
+
+---
+
+## ez-ha -- The Skill
+
+> Give any AI agent the ability to talk to Home Assistant -- query entities, call services, check automations, and debug issues.
 
 ```bash
 npx skills add araa47/ez-ha
 ```
 
-### Why ez-ha?
+<details>
+<summary><strong>Why ez-ha?</strong></summary>
 
-Most Home Assistant integrations give agents a flat list of API endpoints and expect them to figure it out. **ez-ha is designed for agents from the ground up:**
+<br>
 
-- **Self-discovering** — the agent runs `ha search <room>` or `ha <domain>` and gets back the matching entities *and* the exact commands to control them. No guessing, no hallucinating entity IDs.
-- **Two-step workflow** — discover, then act. `ha fan` returns all fans + available actions like `ha fan speed bedroom 60`. The agent always knows what it can do before doing it.
-- **Compact output** — responses are minimal JSON by default, saving tokens. Add `-v` for full details or `-H` for human-readable tables.
-- **Fuzzy matching** — `ha scene movie` finds `scene.movie_night`. `ha script bassdrive` finds the right script. Agents don't need exact entity IDs.
-- **Every domain covered** — lights, fans, covers, locks, switches, climate, humidifiers, media players, scenes, scripts, automations, weather, buttons, and natural language via Assist.
+Most HA integrations hand agents a flat list of API endpoints and hope for the best. **ez-ha is built for agents from the ground up:**
 
-This means agents can perform complex multi-step actions (e.g. "set the bedroom to movie mode: dim lights to 20%, close the blinds, turn on the AC to 22C, and play the movie night scene") by discovering what's available and chaining commands — no hardcoded knowledge needed.
+- **Self-discovering** -- `ha search <room>` returns matching entities *and* the exact commands to control them. No guessing, no hallucinated entity IDs.
+- **Two-step workflow** -- discover, then act. `ha fan` lists all fans with actions like `ha fan speed bedroom 60`. The agent always knows what it can do before doing it.
+- **Compact output** -- minimal JSON by default, saving tokens. Add `-v` for full detail or `-H` for human-readable tables.
+- **Fuzzy matching** -- `ha scene movie` finds `scene.movie_night`. `ha script bassdrive` finds the right script. No exact IDs needed.
+- **Every domain** -- lights, fans, covers, locks, switches, climate, humidifiers, media players, scenes, scripts, automations, weather, buttons, and natural language via Assist.
+
+Agents can chain complex multi-step actions (e.g. *"set the bedroom to movie mode: dim lights to 20 %, close the blinds, turn on the AC to 22 C, and play the movie night scene"*) by discovering what's available and composing commands -- no hardcoded knowledge needed.
+
+</details>
 
 ### Quick start
 
 ```bash
-# Agent discovers what's in the bedroom
+# 1. Discover what's in the bedroom
 ha search bedroom
+# => {"entities": [...], "actions": {"light": {"on": "ha light on [area]", ...}, "fan": {...}}}
 
-# Response includes entities AND how to control each one:
-# {"entities": [...], "actions": {"light": {"on": "ha light on [area]", ...}, "fan": {...}}}
-
-# Agent acts
+# 2. Act
 ha on light.bedroom --brightness 50
 ha fan speed fan.bedroom 60
 ha cover close cover.bedroom_blinds
 ```
 
-> **Requires:** A running Home Assistant instance with a long-lived access token. Set `HA_URL` and `HA_TOKEN` in your environment.
+> **Requires:** a running Home Assistant instance with a long-lived access token.
+> Set `HA_URL` and `HA_TOKEN` in your environment (or `.env` file).
 
 ---
 
-## Part 2 — Coming Soon: The ez-ha Home Assistant Addon
+## ez-ha -- The Addon *(BETA)*
 
-A Home Assistant addon that runs an AI coding agent directly inside your HAOS instance — with full system access, shell, and a headless browser to verify changes visually.
+> A Home Assistant addon that runs **Claude Code** directly inside HAOS -- full config access, Supervisor API, and a web terminal in your sidebar.
 
-### What it does
+> [!WARNING]
+> This addon is under active development. Expect rough edges. [Report issues here.](https://github.com/araa47/ez-ha/issues)
 
-- Runs **Claude Code** in your HA sidebar (Codex and Cursor support coming)
-- Full read/write access to your HA config files via shell
-- Headless **Playwright browser** — the agent can open your dashboards and verify things actually look right
-- Config changes recommended to be **git-backed** (the agent will commit after edits)
-- Persistent sessions via tmux — navigate away, come back, still running
+### Highlights
+
+| Feature | Details |
+|:--------|:--------|
+| **Web terminal** | ttyd + tmux in your HA sidebar -- persistent sessions survive page reloads |
+| **Claude Code** | Pre-installed -- run `claude` and start asking questions |
+| **Config access** | Full read/write to `/config/` -- automations, scripts, scenes, custom components |
+| **`ha` CLI** | The same ez-ha skill, auto-configured with your HA credentials |
+| **`ha-supervisor`** | Restart HA, validate configs, reload automations, view logs |
+| **Browser testing** | Playwright pre-installed -- run `install-browser` on 8 GB+ devices |
+| **SSH** | Optional direct host access for advanced debugging |
 
 ### Install
 
-1. Go to **Settings → Add-ons → Add-on Store**
-2. Click ... → **Repositories** → add:
+1. **Settings** -> **Add-ons** -> **Add-on Store**
+2. **...** -> **Repositories** -> paste:
    ```
    https://github.com/araa47/ez-ha
    ```
-3. Find **ez-ha** in the store and install
-4. Set some variables in the Configuration tab
-5. Start the addon → open from the sidebar
+3. Find **ez-ha Claude Agent** and click **Install**
+4. *(Optional)* Set your Anthropic API key in the **Configuration** tab
+5. **Start** the addon -> open **Claude Agent** from the sidebar
+6. Run `claude` in the terminal
+
+### Configuration
+
+| Option | Description |
+|:-------|:------------|
+| `anthropic_api_key` | Anthropic API key *(or run `claude auth` in the terminal)* |
+| `ssh_host` | IP / hostname to SSH into the HA host *(optional)* |
+| `ssh_port` | SSH port *(default: 22)* |
+| `ssh_username` | SSH user *(default: root)* |
 
 ### What the agent can do
 
-- Edit `automations.yaml`, `scripts.yaml`, `configuration.yaml`, custom components
-- Reload or restart HA after changes
-- Open a real browser and navigate to your dashboard to visually verify changes
-- Debug why an automation isn't triggering
-- Write and test new integrations end-to-end
+```text
+ha search bedroom                     # discover entities
+ha light on bedroom --brightness 50   # control devices
+ha-supervisor check                   # validate YAML config
+ha-supervisor reload automations      # reload without restart
+ha-supervisor restart                 # full HA restart
+ha-supervisor logs 50                 # tail core logs
+install-browser                       # enable Playwright (8 GB+ RAM)
+ssh-ha                                # SSH to host (if configured)
+```
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## License
+
+See [LICENSE](LICENSE) for details.
