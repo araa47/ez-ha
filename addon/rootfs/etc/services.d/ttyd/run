@@ -1,0 +1,11 @@
+#!/usr/bin/with-contenv bashio
+# Start ttyd → tmux session on the ingress port
+# shellcheck disable=SC1091
+. /etc/profile.d/ha-env.sh
+
+exec ttyd \
+    -p 8099 \
+    -t fontSize=14 \
+    -t 'theme={"background":"#1e1e2e","foreground":"#cdd6f4"}' \
+    -W \
+    tmux new-session -A -s main

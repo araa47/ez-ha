@@ -49,33 +49,48 @@ ha cover close cover.bedroom_blinds
 
 ---
 
-## Part 2 — Coming Soon: The ez-ha Home Assistant Addon
+## Part 2 — The ez-ha Home Assistant Addon
 
-A Home Assistant addon that runs an AI coding agent directly inside your HAOS instance — with full system access, shell, and a headless browser to verify changes visually.
+A Home Assistant addon that runs Claude Code directly inside your HAOS instance — with full config file access, Supervisor API control, and a web terminal in your sidebar.
 
 ### What it does
 
-- Runs **Claude Code** in your HA sidebar (Codex and Cursor support coming)
-- Full read/write access to your HA config files via shell
-- Headless **Playwright browser** — the agent can open your dashboards and verify things actually look right
-- Config changes recommended to be **git-backed** (the agent will commit after edits)
-- Persistent sessions via tmux — navigate away, come back, still running
+- **Web terminal in your HA sidebar** — ttyd + tmux, persistent sessions
+- **Claude Code** pre-installed — launch `claude` and start asking questions
+- **Full read/write access** to your HA config files (`/config/`)
+- **`ha` CLI built-in** — the same ez-ha skill, pre-configured with your HA instance
+- **`ha-supervisor` helper** — restart HA, validate configs, reload automations, view logs
+- **Optional SSH** — connect to the HA host for advanced debugging
+- **Optional browser testing** — install Playwright on devices with 8GB+ RAM
 
 ### Install
 
 1. Go to **Settings → Add-ons → Add-on Store**
-2. Click ... → **Repositories** → add:
+2. Click **...** → **Repositories** → add:
    ```
    https://github.com/araa47/ez-ha
    ```
-3. Find **ez-ha** in the store and install
-4. Set some variables in the Configuration tab
-5. Start the addon → open from the sidebar
+3. Find **ez-ha Claude Agent** in the store and install
+4. (Optional) Set your Anthropic API key in the **Configuration** tab
+5. Start the addon → open **Claude Agent** from the sidebar
+6. Run `claude` in the terminal to start
+
+### Configuration
+
+| Option | Description |
+|--------|-------------|
+| `anthropic_api_key` | Your Anthropic API key (or authenticate inside the terminal with `claude auth`) |
+| `ssh_host` | IP/hostname to SSH into HA host (optional) |
+| `ssh_port` | SSH port (default: 22) |
+| `ssh_username` | SSH user (default: root) |
 
 ### What the agent can do
 
 - Edit `automations.yaml`, `scripts.yaml`, `configuration.yaml`, custom components
-- Reload or restart HA after changes
-- Open a real browser and navigate to your dashboard to visually verify changes
+- Validate config with `ha-supervisor check` before restarting
+- Reload automations/scripts/scenes without a full restart
+- Restart HA when needed via `ha-supervisor restart`
+- Query and control devices via `ha search`, `ha light on`, etc.
+- View HA core logs with `ha-supervisor logs`
 - Debug why an automation isn't triggering
-- Write and test new integrations end-to-end
+- SSH to the host for advanced operations (if configured)

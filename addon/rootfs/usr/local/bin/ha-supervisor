@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# Wrapper around the Home Assistant Supervisor API.
+# Usage: ha-supervisor <command> [args]
+set -euo pipefail
+
+API="http://supervisor"
+AUTH="Authorization: Bearer ${SUPERVISOR_TOKEN}"
+CT="Content-Type: application/json"
+
+_get()  { curl -sSL -H "$AUTH" "$1"; }
+_post() { curl -sSL -X POST -H "$AUTH" -H "$CT" "$1"; }
+
+case "${1:-help}" in
+    restart)
+        echo "Restarting Home Assistant core..."
+        _post "$API/core/restart"
+        ;;
+    stop)
+        _post "$API/core/stop"
+        ;;
+    check)
+        echo "Validating configuration..."
+        _post "$API/core/check"
+        ;;
+    logs)
+        lines="${2:-100}"
+        _get "$API/core/logs" | tail -n "$lines"
+        ;;
+    info)
+        _get "$API/core/info" | jq .
+        ;;
+    reload)
+        target="${2:-all}"
+        case "$target" in
+            automations) _post "$API/core/api/services/automation/reload" ;;
+            scripts)     _post "$API/core/api/services/script/reload" ;;
+            scenes)      _post "$API/core/api/services/scene/reload" ;;
+            groups)      _post "$API/core/api/services/group/reload" ;;
+            core|all)    _post "$API/core/api/services/homeassistant/reload_all" ;;
+            *)
+                echo "Usage: ha-supervisor reload [automations|scripts|scenes|groups|core]"
+                exit 1
+                ;;
+        esac
+        echo "Reloaded $target"
+        ;;
+    addon-logs)
+        slug="${2:?Usage: ha-supervisor addon-logs <slug>}"
+        _get "$API/addons/${slug}/logs"
+        ;;
+    addons)
+        _get "$API/addons" | jq '.data.addons[] | {slug, name, state}'
+        ;;
+    host-info)
+        _get "$API/host/info" | jq .
+        ;;
+    network)
+        _get "$API/network/info" | jq .
+        ;;
+    *)
+        cat <<'EOF'
+ha-supervisor — Home Assistant Supervisor API helper
+
+Commands:
+  restart                Restart HA core
+  stop                   Stop HA core
+  check                  Validate HA configuration
+  logs [N]               Show last N lines of HA core logs (default 100)
+  info                   HA core info (version, etc.)
+  reload <target>        Reload automations|scripts|scenes|groups|core
+  addons                 List installed addons
+  addon-logs <slug>      Logs for a specific addon
+  host-info              Host system info
+  network                Network configuration
+EOF
+        ;;
+esac
