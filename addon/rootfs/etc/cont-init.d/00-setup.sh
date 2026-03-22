@@ -17,7 +17,7 @@ ln -sf /data/claude-config /root/.claude
 # Build /etc/profile.d/ha-env.sh (overwrite each start — do NOT append)
 # ---------------------------------------------------------------------------
 cat > /etc/profile.d/ha-env.sh <<ENVEOF
-export HA_URL=http://homeassistant:8123
+export HA_URL=http://supervisor/core
 export HA_TOKEN=${SUPERVISOR_TOKEN}
 export SUPERVISOR_TOKEN=${SUPERVISOR_TOKEN}
 export IS_SANDBOX=1

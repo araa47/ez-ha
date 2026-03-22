@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.6
+
+- **Fix:** `ha` CLI 401 Unauthorized — `SUPERVISOR_TOKEN` only works via the Supervisor proxy, not direct to `http://homeassistant:8123`. Changed `HA_URL` from `http://homeassistant:8123` to `http://supervisor/core` so API calls go through the Supervisor proxy where the token is valid.
+
 ## 0.0.5
 
 - **Fix:** `cc` alias (`claude --dangerously-skip-permissions`) now works as root — set `IS_SANDBOX=1` since the addon container is a sandbox
