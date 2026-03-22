@@ -76,6 +76,8 @@ ha cover close cover.bedroom_blinds
 
 > A Home Assistant addon that runs **Claude Code** directly inside HAOS -- full config access, Supervisor API, and a web terminal in your sidebar.
 
+The addon runs as an HA ingress panel — it serves a ttyd web terminal through HA's built-in reverse proxy, so it appears as a sidebar tab in your HA UI. The terminal is a full Linux shell (you can use it for anything), but it's purpose-built for running Claude Code against your HA instance.
+
 ### Highlights
 
 | Feature | Details |
@@ -85,7 +87,7 @@ ha cover close cover.bedroom_blinds
 | **Config access** | Full read/write to `/config/` -- automations, scripts, scenes, custom components |
 | **`ha` CLI** | The same ez-ha skill, auto-configured with your HA credentials |
 | **`ha-supervisor`** | Restart HA, validate configs, reload automations, view logs |
-| **Browser testing** | agent-browser + Chrome for Testing pre-installed |
+| **Browser testing** | Playwright + Chromium pre-installed — `browser-login` authenticates the session |
 | **SSH** | Auto-generated key pair, optional direct host access for advanced debugging |
 | **`cc` alias** | `claude --dangerously-skip-permissions` for fully autonomous operation |
 
@@ -106,15 +108,35 @@ ha cover close cover.bedroom_blinds
 | Option | Description |
 |:-------|:------------|
 | `anthropic_api_key` | Anthropic API key *(or run `claude auth` in the terminal)* |
-| `ha_username` | HA user for browser access *(optional — create a user without 2FA)* |
-| `ha_password` | HA password for browser access *(optional)* |
+| `ha_username` | HA user for browser access *(optional — see below)* |
+| `ha_password` | HA password for browser access *(optional — see below)* |
 | `ssh_host` | IP / hostname to SSH into the HA host *(optional)* |
 | `ssh_port` | SSH port *(default: 22)* |
 | `ssh_username` | SSH user *(default: root)* |
-| `expressvpn_enabled` | Enable ExpressVPN tunnel *(default: false)* |
-| `expressvpn_username` | OpenVPN username from ExpressVPN manual setup |
-| `expressvpn_password` | OpenVPN password from ExpressVPN manual setup |
+| `expressvpn_enabled` | Enable OpenVPN tunnel *(default: false)* |
+| `expressvpn_username` | OpenVPN username (e.g. from ExpressVPN manual setup) |
+| `expressvpn_password` | OpenVPN password |
 | `expressvpn_config` | `.ovpn` filename in `/config/expressvpn/` *(optional — uses first found)* |
+
+### Browser access user
+
+To let the agent interact with the HA web UI (take screenshots, verify dashboards, test UI changes), create a dedicated local user:
+
+1. **Settings** -> **People** -> **Add Person** -> **Allow person to login**
+2. Set a username/password (e.g. `claude` / `claude`)
+3. **Important:** set the user to **Local access only** — this account never needs internet access
+4. **Do not enable 2FA** — the agent logs in headlessly via Playwright
+5. Enter the credentials in the addon config (`ha_username` / `ha_password`)
+
+The agent uses `browser-login` to authenticate a headless Chromium session. The session is persisted so it only needs to log in once.
+
+### VPN
+
+The addon has an optional built-in OpenVPN client. This is useful if the agent needs outbound internet access through a VPN (e.g. for API calls, package installs, or web browsing). It works with any provider that supplies `.ovpn` config files — ExpressVPN, NordVPN, Surfshark, etc.
+
+1. Drop your `.ovpn` file into `/config/expressvpn/`
+2. Set `expressvpn_enabled: true` and your OpenVPN credentials in the addon config
+3. Verify with `curl -s https://ipinfo.io` in the terminal
 
 ### What the agent can do
 
@@ -125,8 +147,8 @@ ha-supervisor check                   # validate YAML config
 ha-supervisor reload automations      # reload without restart
 ha-supervisor restart                 # full HA restart
 ha-supervisor logs 50                 # tail core logs
-browser-login                         # authenticate browser for HA UI access
-agent-browser                         # browser automation (Chromium pre-installed)
+browser-login                         # authenticate Playwright session for HA UI
+playwright                            # browser automation (Chromium pre-installed)
 ssh-ha                                # SSH to host (if configured)
 cc                                    # claude --dangerously-skip-permissions
 curl -s https://ipinfo.io             # verify VPN country (if enabled)
