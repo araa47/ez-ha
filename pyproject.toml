@@ -1,0 +1,37 @@
+[project]
+name = "ez-ha"
+version = "0.1.0"
+description = "Python UV Boilerplate contains all the boilerplate you need to create a Python repo"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "homeassistant-api>=5.0.3",
+    "python-dotenv>=1.2.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.15.4",
+    "prek>=0.3.4",
+    "pytest",
+    "pytest-asyncio>=1.3.0",
+    "pytest-cov",
+    "ty>=0.0.19",
+]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.isort]
+profile = "black"
+src_paths = "tests"
+line_length = 80
+include_trailing_comma = true
+multi_line_output = 3
+
+[tool.ruff]
+select = ["E", "F", "B"]
+exclude = ["__pycache__", "terraform", ".git", ".venv"]
+ignore = ["E501"]
