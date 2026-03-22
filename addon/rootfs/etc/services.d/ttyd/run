@@ -8,4 +8,4 @@ exec ttyd \
     -t fontSize=14 \
     -t 'theme={"background":"#1e1e2e","foreground":"#cdd6f4"}' \
     -W \
-    tmux new-session -A -s main
+    tmux new-session -A -s main -c /root
