@@ -1,0 +1,4 @@
+#!/usr/bin/execlineb -S1
+# Restart openvpn if it exits unexpectedly
+if { s6-test ${1} -ne 0 }
+s6-svc -r /var/run/s6/services/openvpn

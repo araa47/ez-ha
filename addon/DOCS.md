@@ -37,6 +37,37 @@ To give Claude SSH access to the HA host:
 3. Set `ssh_host` in this addon's configuration to your HA host IP
 4. Restart this addon — the `ssh-ha` alias will be available in the terminal
 
+## ExpressVPN (optional)
+
+Route all addon traffic through ExpressVPN so Claude API calls originate from another country.
+
+### Setup
+
+1. Go to [ExpressVPN Manual Config](https://www.expressvpn.com/setup#manual) and sign in
+2. Select **OpenVPN** — copy your **username** and **password** (these are *not* your account credentials)
+3. Download the `.ovpn` file for your desired server location
+4. Place the `.ovpn` file in `/config/expressvpn/` on your HA instance (create the folder if needed)
+5. In the addon **Configuration** tab, set:
+
+| Option | Description |
+|--------|-------------|
+| `expressvpn_enabled` | Set to `true` to enable VPN |
+| `expressvpn_username` | OpenVPN username from step 2 |
+| `expressvpn_password` | OpenVPN password from step 2 |
+| `expressvpn_config` | *(optional)* Filename of the `.ovpn` file (e.g. `my_expressvpn_usa.ovpn`). If omitted, the first `.ovpn` file found is used |
+
+6. Restart the addon
+
+### Verify
+
+Inside the terminal, run:
+
+```bash
+curl -s https://ipinfo.io
+```
+
+You should see the VPN server's IP and country.
+
 ## Browser testing (optional)
 
 For users with more resources (8GB+ RAM), you can install Playwright inside the container:

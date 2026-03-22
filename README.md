@@ -112,6 +112,10 @@ ha cover close cover.bedroom_blinds
 | `ssh_host` | IP / hostname to SSH into the HA host *(optional)* |
 | `ssh_port` | SSH port *(default: 22)* |
 | `ssh_username` | SSH user *(default: root)* |
+| `expressvpn_enabled` | Enable ExpressVPN tunnel *(default: false)* |
+| `expressvpn_username` | OpenVPN username from ExpressVPN manual setup |
+| `expressvpn_password` | OpenVPN password from ExpressVPN manual setup |
+| `expressvpn_config` | `.ovpn` filename in `/config/expressvpn/` *(optional — uses first found)* |
 
 ### What the agent can do
 
@@ -124,6 +128,7 @@ ha-supervisor restart                 # full HA restart
 ha-supervisor logs 50                 # tail core logs
 install-browser                       # enable Playwright (8 GB+ RAM)
 ssh-ha                                # SSH to host (if configured)
+curl -s https://ipinfo.io             # verify VPN country (if enabled)
 ```
 
 ---
