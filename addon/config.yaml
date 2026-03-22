@@ -9,8 +9,10 @@ arch:
     - aarch64
 startup: application
 boot: auto
+init: false
 ingress: true
 ingress_port: 8099
+ingress_stream: true
 panel_icon: mdi:robot
 panel_title: Claude Agent
 map:
