@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.9
+
+- **New:** zsh as default shell with starship prompt, eza, fzf, syntax highlighting, autosuggestions, and history substring search
+- **New:** Full Catppuccin Mocha color palette in ttyd terminal (was only bg/fg)
+- **New:** Persistent zsh history across container restarts
+- **New:** Addon icon and logo for HA addon store
+- **Fix:** Logo now uses transparent background
+
 ## 0.0.7
 
 - **Fix:** Claude Code auth (OAuth login) no longer lost on addon restart — set `CLAUDE_CONFIG_DIR=/data/claude-config` so credentials are written directly to persistent storage instead of relying on `$HOME` resolving to the symlinked path. Also export `HOME=/root` explicitly for consistency.
