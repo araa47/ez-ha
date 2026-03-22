@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="ez-ha.png" alt="ez-ha logo" width="400">
+  <img src="addon/logo.png" alt="ez-ha logo" width="256">
 </p>
 <p align="center">
   <strong>Home Assistant, meet your AI agent.</strong>
