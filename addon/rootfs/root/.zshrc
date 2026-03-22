@@ -45,51 +45,11 @@ alias ll='eza -la --color=always --icons=always --group-directories-first'
 alias la='eza -a --color=always --icons=always --group-directories-first'
 alias lt='eza --tree --level=2 --color=always --icons=always'
 
-# ---------------------------------------------------------------------------
-# Git aliases
-# ---------------------------------------------------------------------------
-alias s='git status -sb'
-alias ga='git add -A'
-alias gap='git add -p'
-alias gbr='git branch -v'
-alias gco='git checkout'
-alias gd='git diff -M'
-alias gdc='git diff --cached -M'
-alias gf='git fetch'
-alias glog='git log --date-order --pretty="format:%C(yellow)%h%Cblue%d%Creset %s %C(white) %an, %ar%Creset"'
-alias gl='glog --graph'
-alias gla='gl --all'
-alias gp='git push'
-alias grb='git rebase -p'
-alias grba='git rebase --abort'
-alias grbc='git rebase --continue'
-alias gr='git reset'
-alias grv='git remote -v'
-alias gs='git show'
-alias gst='git stash'
-alias gstp='git stash pop'
-alias gup='git pull'
-
 # Tmux
 alias tm='tmux attach -t main || tmux new -s main'
 
 # Reload shell
 alias src='exec zsh'
-
-# ---------------------------------------------------------------------------
-# Git helper functions
-# ---------------------------------------------------------------------------
-gc() {
-  git diff --cached | grep '\btap[ph]\b' >/dev/null &&
-    echo "\e[0;31;29mOops, there's a #tapp or similar in that diff.\e[0m" ||
-    git commit -v "$@"
-}
-
-git_current_branch() {
-  cat "$(git rev-parse --git-dir 2>/dev/null)/HEAD" | sed -e 's/^.*refs\/heads\///'
-}
-
-alias gpthis='gp origin $(git_current_branch)'
 
 # ---------------------------------------------------------------------------
 # FZF

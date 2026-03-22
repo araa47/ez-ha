@@ -2,8 +2,7 @@
 
 ## 0.0.9
 
-- **New:** zsh as default shell with starship prompt, eza, fzf, syntax highlighting, autosuggestions, and history substring search — matching rex's dotfiles
-- **New:** Git aliases (`s`, `ga`, `gco`, `gd`, `gl`, `gp`, `gup`, etc.)
+- **New:** zsh as default shell with starship prompt, eza, fzf, syntax highlighting, autosuggestions, and history substring search
 - **New:** Full Catppuccin Mocha color palette in ttyd terminal (was only bg/fg)
 - **New:** Persistent zsh history across container restarts
 - **New:** Addon icon and logo for HA addon store
