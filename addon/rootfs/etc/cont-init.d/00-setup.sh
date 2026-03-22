@@ -2,12 +2,16 @@
 # One-time setup: env vars, persistent config, SSH
 
 # ---------------------------------------------------------------------------
-# Persist Claude Code config across container restarts
+# Persist Claude Code config (auth, settings) across container restarts
 # ---------------------------------------------------------------------------
 mkdir -p /data/claude-config
-if [ ! -d /root/.claude ]; then
-    ln -sf /data/claude-config /root/.claude
+# If .claude exists as a real dir (not symlink), migrate contents to persistent storage
+if [ -d /root/.claude ] && [ ! -L /root/.claude ]; then
+    cp -a /root/.claude/. /data/claude-config/ 2>/dev/null || true
 fi
+# Always (re)create the symlink — handles fresh containers and stale symlinks
+rm -rf /root/.claude
+ln -sf /data/claude-config /root/.claude
 
 # ---------------------------------------------------------------------------
 # Build /etc/profile.d/ha-env.sh (overwrite each start — do NOT append)
@@ -16,6 +20,7 @@ cat > /etc/profile.d/ha-env.sh <<ENVEOF
 export HA_URL=http://homeassistant:8123
 export HA_TOKEN=${SUPERVISOR_TOKEN}
 export SUPERVISOR_TOKEN=${SUPERVISOR_TOKEN}
+export IS_SANDBOX=1
 ENVEOF
 
 # Anthropic API key (from addon options)

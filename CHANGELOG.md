@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.0.5
+
+- **Fix:** `cc` alias (`claude --dangerously-skip-permissions`) now works as root — set `IS_SANDBOX=1` since the addon container is a sandbox
+- **Fix:** Terminal now opens in `/root` (home dir) instead of `/config`
+- **Fix:** Claude Code auth (subscription login) now persists across addon restarts — improved `~/.claude` symlink handling to `/data/claude-config`
+
 ## 0.0.4
 
 - **Fix:** Use Alpine's `chromium` package instead of Chrome for Testing (glibc) — fixes Docker build failure on Alpine/musl
