@@ -33,9 +33,15 @@ This addon runs a web terminal (via ttyd + tmux) accessible from your HA sidebar
 To give Claude SSH access to the HA host:
 
 1. Install the **SSH & Web Terminal** addon (or enable SSH on your host)
-2. Place your SSH key at `/config/.ssh/id_ed25519` (or `id_rsa`)
-3. Set `ssh_host` in this addon's configuration to your HA host IP
-4. Restart this addon — the `ssh-ha` alias will be available in the terminal
+2. Set `ssh_host` in this addon's configuration to your HA host IP
+3. Restart this addon — an SSH key pair is auto-generated at `/config/.ssh/id_ed25519`
+4. Copy the public key into the SSH addon's authorized keys:
+   - Open the **SSH & Web Terminal** addon configuration
+   - Paste the contents of `/config/.ssh/id_ed25519.pub` into the `authorized_keys` list
+   - Restart the SSH addon
+5. The `ssh-ha` alias will now be available in the terminal
+
+> **Note:** The generated key is persisted in `/config/.ssh/` so it survives addon restarts. You can also place your own key there instead.
 
 ## ExpressVPN (optional)
 
@@ -68,14 +74,10 @@ curl -s https://ipinfo.io
 
 You should see the VPN server's IP and country.
 
-## Browser testing (optional)
+## Browser testing
 
-For users with more resources (8GB+ RAM), you can install Playwright inside the container:
+`agent-browser` and Chrome for Testing are pre-installed. Claude can open your HA dashboard in a headless browser, take screenshots, and verify changes visually.
 
-```bash
-apk add chromium
-npm install -g playwright
-npx playwright install chromium
-```
+## `cc` alias
 
-This lets Claude open your HA dashboard in a headless browser and verify changes visually.
+The `cc` command runs `claude --dangerously-skip-permissions` — useful for fully autonomous operation without permission prompts.
