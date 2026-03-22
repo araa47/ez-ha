@@ -4,22 +4,16 @@
 # dependencies = [
 #   "HomeAssistant-API>=5.0.3",
 #   "python-dotenv>=1.0.1",
+#   "typer>=0.12.0",
 # ]
 # ///
 """Home Assistant CLI — agent-friendly, compact by default.
 
-Convention:
-  singular = action   ha light on bedroom, ha cover open curtains
-  plural   = list     ha lights, ha covers
-  generic  = any      ha on <entity_id>, ha off <entity_id>
-
-Usage: ha <command> [options]
-       uv run skills/ha/scripts/ha.py <command> [options]
+Run `ha --help` for all commands, `ha <domain>` to discover entities and actions.
 """
 
 from __future__ import annotations
 
-import argparse
 import asyncio
 import json
 import os
@@ -27,18 +21,48 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import typer
 from dotenv import load_dotenv
 from homeassistant_api import Client as HAClient
 
-CONFIG_PATHS = [
-    Path.cwd() / ".ha.json",
-    Path.home() / ".config" / "home-assistant" / "config.json",
-]
+# ---------------------------------------------------------------------------
+# App
+# ---------------------------------------------------------------------------
+
+app = typer.Typer(
+    help="Home Assistant CLI — compact JSON output. Run 'ha <domain>' to list entities and actions.",
+    add_completion=False,
+    no_args_is_help=True,
+)
+
+
+class _State:
+    verbose: bool = False
+    human: bool = False
+
+
+_st = _State()
+
+
+@app.callback()
+def _callback(
+    verbose: bool = typer.Option(False, "-v", "--verbose", help="Full JSON output"),
+    human: bool = typer.Option(
+        False, "-H", "--human", help="Pretty human-readable output"
+    ),
+) -> None:
+    _st.verbose = verbose
+    _st.human = human
 
 
 # ---------------------------------------------------------------------------
 # Config / helpers
 # ---------------------------------------------------------------------------
+
+CONFIG_PATHS = [
+    Path.cwd() / ".ha.json",
+    Path.home() / ".config" / "home-assistant" / "config.json",
+]
 
 
 def _die(msg: str) -> None:
@@ -78,15 +102,86 @@ def normalize(value: Any) -> Any:
     return value
 
 
+def _human_print(data: Any) -> None:
+    """Pretty human-readable output using rich."""
+    from rich.console import Console
+    from rich.table import Table
+
+    console = Console()
+
+    if isinstance(data, dict) and "entities" in data:
+        entities = data["entities"]
+        if not entities:
+            console.print("[dim]No entities found.[/dim]")
+            return
+        table = Table(show_header=True, header_style="bold")
+        table.add_column("Entity ID", style="cyan")
+        table.add_column("State", style="green")
+        table.add_column("Name")
+        sample = entities[0] if entities else {}
+        extra_cols = [
+            k
+            for k in sample
+            if k not in ("entity_id", "state", "name") and sample[k] is not None
+        ]
+        for col in extra_cols:
+            table.add_column(col.replace("_", " ").title())
+        for e in entities:
+            row = [
+                str(e.get("entity_id", "")),
+                str(e.get("state", "")),
+                str(e.get("name", "")),
+            ]
+            for col in extra_cols:
+                row.append(str(e.get(col, "")))
+            table.add_row(*row)
+        console.print(table)
+        if "actions" in data:
+            console.print("\n[bold]Actions:[/bold]")
+            actions = data["actions"]
+            if isinstance(actions, dict):
+                for domain_or_key, val in actions.items():
+                    if isinstance(val, dict):
+                        console.print(f"  [bold]{domain_or_key}:[/bold]")
+                        for name, cmd in val.items():
+                            console.print(f"    [dim]{name}:[/dim] {cmd}")
+                    else:
+                        console.print(f"  [dim]{domain_or_key}:[/dim] {val}")
+    elif isinstance(data, list) and data and isinstance(data[0], dict):
+        table = Table(show_header=True, header_style="bold")
+        for key in data[0]:
+            table.add_column(key.replace("_", " ").title())
+        for row_data in data:
+            table.add_row(*[str(v) for v in row_data.values()])
+        console.print(table)
+    elif isinstance(data, dict) and "ok" in data:
+        if data.get("ok"):
+            parts = [f"[green]OK[/green] {data.get('entity_id', '')}"]
+            if "action" in data:
+                parts.append(f"[dim]{data['action']}[/dim]")
+            extras = {
+                k: v for k, v in data.items() if k not in ("ok", "entity_id", "action")
+            }
+            if extras:
+                parts.append(str(extras))
+            console.print(" ".join(parts))
+        else:
+            console.print(f"[red]FAIL[/red] {data}")
+    else:
+        console.print_json(json.dumps(data))
+
+
 def out(data: Any, *, verbose: bool = False) -> None:
-    if verbose:
+    if _st.human:
+        _human_print(data)
+    elif verbose:
         print(json.dumps(data, indent=2))
     else:
         print(json.dumps(data, separators=(",", ":")))
 
 
 # ---------------------------------------------------------------------------
-# Slim formatters (compact entity representations)
+# Slim formatters
 # ---------------------------------------------------------------------------
 
 _SLIM_KEYS: dict[str, tuple[str, ...]] = {
@@ -117,7 +212,6 @@ _SLIM_KEYS: dict[str, tuple[str, ...]] = {
 
 
 def slim(state: dict[str, Any], domain: str | None = None) -> dict[str, Any]:
-    """Compact entity representation. Domain-aware key selection."""
     attrs = state.get("attributes", {})
     if domain is None:
         domain = state.get("entity_id", "").split(".", 1)[0]
@@ -190,7 +284,6 @@ def _rest(
     *,
     raw: bool = False,
 ) -> Any:
-    """Unified REST helper. Returns parsed JSON by default, raw text if raw=True."""
     import urllib.error
     import urllib.request
 
@@ -237,35 +330,85 @@ def _filter_domain_area(
 
 
 def _prefix(raw: str, domain: str) -> str:
-    """Ensure entity_id has domain prefix."""
     return raw if raw.startswith(f"{domain}.") else f"{domain}.{raw}"
 
 
-def _fuzzy_run(
-    args: argparse.Namespace,
-    domain: str,
-    service: str,
-    id_attr: str,
+DOMAIN_ACTIONS: dict[str, dict[str, str]] = {
+    "light": {
+        "on": "ha light on [area]",
+        "off": "ha light off [area]",
+        "power": "ha on/off/toggle <entity_id> [--brightness N]",
+    },
+    "fan": {
+        "speed": "ha fan speed <entity_id> <0-100>",
+        "preset": "ha fan preset <entity_id> <mode>",
+        "oscillate": "ha fan oscillate <entity_id> on|off",
+        "power": "ha on/off/toggle <entity_id>",
+    },
+    "cover": {
+        "open": "ha cover open <entity_id>",
+        "close": "ha cover close <entity_id>",
+        "stop": "ha cover stop <entity_id>",
+        "position": "ha cover position <entity_id> <0-100>",
+    },
+    "lock": {
+        "lock": "ha lock lock <entity_id>",
+        "unlock": "ha lock unlock <entity_id>",
+    },
+    "switch": {"power": "ha on/off/toggle <entity_id>"},
+    "media_player": {
+        "play": "ha media play <entity_id>",
+        "pause": "ha media pause <entity_id>",
+        "stop": "ha media stop <entity_id>",
+        "next": "ha media next <entity_id>",
+        "prev": "ha media prev <entity_id>",
+        "volume": "ha media volume <entity_id> <0-100>",
+    },
+    "climate": {
+        "set": "ha climate set <entity_id> [--temperature N] [--hvac-mode cool|heat|off|...]",
+    },
+    "humidifier": {
+        "set": "ha humidifier set <entity_id> [--humidity N] [--mode MODE]",
+        "power": "ha on/off <entity_id>",
+    },
+    "automation": {
+        "trigger": "ha automation trigger <entity_id>",
+        "on": "ha automation on <entity_id>",
+        "off": "ha automation off <entity_id>",
+    },
+    "scene": {"activate": "ha scene <name>"},
+    "script": {"run": "ha script <name>"},
+    "button": {"press": "ha button <entity_id>"},
+    "weather": {"show": "ha weather <entity_id>"},
+}
+
+
+def _actions_for_domains(domains: set[str]) -> dict[str, dict[str, str]]:
+    """Return action hints for the given domains."""
+    return {d: DOMAIN_ACTIONS[d] for d in sorted(domains) if d in DOMAIN_ACTIONS}
+
+
+def _list_domain(
+    domain: str, area: str | None, actions: dict[str, str] | None = None
 ) -> None:
-    """Run a service with fuzzy entity matching. Exact > single fuzzy > ambiguous error."""
+    """List entities for a domain with action hints for discoverability."""
     base_url, token = load_config()
-    raw = getattr(args, id_attr)
+    states = safe_run(_get_states(base_url, token))
+    entities = _filter_domain_area(states, domain, area)
+    v = _st.verbose
+    result: dict[str, Any] = {
+        "entities": entities if v else [slim(s, domain) for s in entities],
+    }
+    if actions:
+        result["actions"] = actions
+    out(result, verbose=v)
+
+
+def _fuzzy_find(states: list[dict[str, Any]], domain: str, raw: str) -> str | None:
     exact_id = _prefix(raw, domain)
-    states: list[dict[str, Any]] = safe_run(_get_states(base_url, token))
     pool = [s for s in states if s.get("entity_id", "").startswith(f"{domain}.")]
-
-    # Exact match
     if any(s.get("entity_id") == exact_id for s in pool):
-        result = safe_run(
-            _call_service(base_url, token, domain, service, {"entity_id": exact_id})
-        )
-        if args.verbose:
-            out(result, verbose=True)
-        else:
-            out({"ok": True, "entity_id": exact_id, "action": service})
-        return
-
-    # Fuzzy substring match
+        return exact_id
     q = raw.lower()
     matches = [
         s
@@ -274,15 +417,8 @@ def _fuzzy_run(
         or q in str(s.get("attributes", {}).get("friendly_name", "")).lower()
     ]
     if len(matches) == 1:
-        eid = matches[0].get("entity_id")
-        result = safe_run(
-            _call_service(base_url, token, domain, service, {"entity_id": eid})
-        )
-        if args.verbose:
-            out(result, verbose=True)
-        else:
-            out({"ok": True, "entity_id": eid, "action": service})
-    elif not matches:
+        return matches[0].get("entity_id")
+    if not matches:
         _die(f"No {domain} matching '{raw}'")
     else:
         out(
@@ -292,6 +428,7 @@ def _fuzzy_run(
                 "matches": [s.get("entity_id") for s in matches],
             }
         )
+    return None
 
 
 async def _bulk_service(
@@ -316,15 +453,17 @@ async def _bulk_service(
         return results
 
 
-def _bulk_result(
-    results: list[dict[str, Any]],
-    action: str,
-    domain: str,
-    area: str | None,
-    verbose: bool,
+def _done(result: Any, entity_id: str, action: str, **extra: Any) -> None:
+    if _st.verbose:
+        out(result, verbose=True)
+    else:
+        out({"ok": True, "entity_id": entity_id, "action": action, **extra})
+
+
+def _bulk_done(
+    results: list[dict[str, Any]], action: str, domain: str, area: str | None
 ) -> None:
-    """Format bulk operation output."""
-    if verbose:
+    if _st.verbose:
         out(results, verbose=True)
     else:
         ok = sum(1 for r in results if r.get("ok"))
@@ -340,14 +479,17 @@ def _bulk_result(
 
 
 # ---------------------------------------------------------------------------
-# Commands — query / inspect
+# Top-level commands
 # ---------------------------------------------------------------------------
 
 
-def cmd_info(args: argparse.Namespace) -> None:
+@app.command()
+def info() -> None:
+    """Connection info and HA version."""
     base_url, token = load_config()
     data = safe_run(_get_config(base_url, token))
-    if args.verbose:
+    v = _st.verbose
+    if v:
         out(data, verbose=True)
     else:
         out(
@@ -359,41 +501,58 @@ def cmd_info(args: argparse.Namespace) -> None:
         )
 
 
-def cmd_entities(args: argparse.Namespace) -> None:
+@app.command()
+def entities(
+    domain: str = typer.Option(None, help="Filter by domain (light, switch, ...)"),
+    ids_only: bool = typer.Option(False, "--ids-only", help="Show only entity IDs"),
+) -> None:
+    """List all entities."""
     base_url, token = load_config()
     states: list[dict[str, Any]] = safe_run(_get_states(base_url, token))
-    if args.domain:
-        states = [
-            s for s in states if s.get("entity_id", "").startswith(f"{args.domain}.")
-        ]
-    if args.ids_only:
-        out([s.get("entity_id") for s in states], verbose=args.verbose)
-    elif args.verbose:
+    if domain:
+        states = [s for s in states if s.get("entity_id", "").startswith(f"{domain}.")]
+    v = _st.verbose
+    if ids_only:
+        out([s.get("entity_id") for s in states], verbose=v)
+    elif v:
         out(states, verbose=True)
     else:
         out([slim(s) for s in states])
 
 
-def cmd_search(args: argparse.Namespace) -> None:
+@app.command()
+def search(query: str) -> None:
+    """Search entities by id or friendly name. Shows matching entities and available actions."""
     base_url, token = load_config()
-    states: list[dict[str, Any]] = safe_run(_get_states(base_url, token))
-    q = args.query.lower()
+    states = safe_run(_get_states(base_url, token))
+    q = query.lower()
     hits = [
         s
         for s in states
         if q in str(s.get("entity_id", "")).lower()
         or q in str(s.get("attributes", {}).get("friendly_name", "")).lower()
     ]
-    out(hits if args.verbose else [slim(s) for s in hits], verbose=args.verbose)
+    v = _st.verbose
+    domains = {str(s.get("entity_id", "")).split(".", 1)[0] for s in hits}
+    result: dict[str, Any] = {
+        "entities": hits if v else [slim(s) for s in hits],
+        "actions": _actions_for_domains(domains),
+    }
+    out(result, verbose=v)
 
 
-def cmd_state(args: argparse.Namespace) -> None:
+@app.command()
+def state(entity_id: str) -> None:
+    """Get current state of an entity."""
     base_url, token = load_config()
-    data = safe_run(_get_state(base_url, token, args.entity_id))
-    out(data if args.verbose else slim(data), verbose=args.verbose)
+    data = safe_run(_get_state(base_url, token, entity_id))
+    v = _st.verbose
+    out(data if v else slim(data), verbose=v)
 
 
-def cmd_areas(args: argparse.Namespace) -> None:
+@app.command()
+def areas() -> None:
+    """List all HA areas."""
     base_url, token = load_config()
     ids_raw = _rest(
         base_url,
@@ -403,8 +562,9 @@ def cmd_areas(args: argparse.Namespace) -> None:
         {"template": "{{ areas() | join('\\n') }}"},
         raw=True,
     )
+    v = _st.verbose
     if not ids_raw or not ids_raw.strip():
-        out([], verbose=args.verbose)
+        out([], verbose=v)
         return
     area_ids = [a.strip() for a in ids_raw.strip().split("\n") if a.strip()]
     parts = [f"{aid}|{{{{ area_name('{aid}') }}}}" for aid in area_ids]
@@ -421,22 +581,29 @@ def cmd_areas(args: argparse.Namespace) -> None:
         if "|" in line:
             aid, name = line.split("|", 1)
             result.append({"id": aid.strip(), "name": name.strip()})
-    out(result, verbose=args.verbose)
+    out(result, verbose=v)
 
 
-def cmd_history(args: argparse.Namespace) -> None:
-    base_url, token = load_config()
+@app.command()
+def history(
+    entity_id: str,
+    count: int = typer.Option(10, "-n", "--count", help="Number of entries"),
+    hours: int = typer.Option(24, "--hours", help="Look-back window in hours"),
+) -> None:
+    """Last N state changes for an entity."""
     from datetime import datetime, timedelta, timezone
 
-    start = datetime.now(timezone.utc) - timedelta(hours=args.hours)
+    base_url, token = load_config()
+    start = datetime.now(timezone.utc) - timedelta(hours=hours)
     ts = start.strftime("%Y-%m-%dT%H:%M:%S+00:00")
-    path = f"/api/history/period/{ts}?filter_entity_id={args.entity_id}&minimal_response&no_attributes"
+    path = f"/api/history/period/{ts}?filter_entity_id={entity_id}&minimal_response&no_attributes"
     data = _rest(base_url, token, "GET", path)
+    v = _st.verbose
     if not data or not isinstance(data, list) or not data[0]:
-        out([], verbose=args.verbose)
+        out([], verbose=v)
         return
-    entries = data[0][-args.count :]
-    if args.verbose:
+    entries = data[0][-count:]
+    if v:
         out(entries, verbose=True)
     else:
         out(
@@ -447,41 +614,53 @@ def cmd_history(args: argparse.Namespace) -> None:
         )
 
 
-def cmd_snapshot(args: argparse.Namespace) -> None:
+@app.command()
+def snapshot(
+    domains: str = typer.Option(
+        None,
+        help="Comma-separated domains (default: light,climate,media_player,fan,cover,lock)",
+    ),
+) -> None:
+    """Current state of key domains."""
     base_url, token = load_config()
-    states: list[dict[str, Any]] = safe_run(_get_states(base_url, token))
-    domains = (
-        tuple(d.strip() for d in args.domains.split(","))
-        if args.domains
-        else (
-            "light",
-            "climate",
-            "media_player",
-            "fan",
-            "cover",
-            "lock",
-        )
+    states = safe_run(_get_states(base_url, token))
+    domain_list = (
+        tuple(d.strip() for d in domains.split(","))
+        if domains
+        else ("light", "climate", "media_player", "fan", "cover", "lock")
     )
+    v = _st.verbose
     result: dict[str, Any] = {}
-    for domain in domains:
-        entities = [
-            s for s in states if s.get("entity_id", "").startswith(f"{domain}.")
-        ]
-        result[domain] = (
-            entities if args.verbose else [slim(s, domain) for s in entities]
-        )
-    out(result, verbose=args.verbose)
+    for d in domain_list:
+        ents = [s for s in states if s.get("entity_id", "").startswith(f"{d}.")]
+        result[d] = ents if v else [slim(s, d) for s in ents]
+    out(result, verbose=v)
 
 
-def cmd_weather(args: argparse.Namespace) -> None:
+@app.command()
+def weather(
+    entity_id: str = typer.Argument(
+        None, help="weather.x (default: weather.forecast_home)"
+    ),
+) -> None:
+    """Current weather — omit entity to list all weather entities."""
     base_url, token = load_config()
-    eid = (
-        _prefix(args.entity_id, "weather")
-        if args.entity_id
-        else "weather.forecast_home"
-    )
+    if entity_id is None:
+        states = safe_run(_get_states(base_url, token))
+        weathers = _filter_domain_area(states, "weather", None)
+        v = _st.verbose
+        out(
+            {
+                "entities": weathers if v else [slim(s) for s in weathers],
+                "actions": DOMAIN_ACTIONS["weather"],
+            },
+            verbose=v,
+        )
+        return
+    eid = _prefix(entity_id, "weather")
     data = safe_run(_get_state(base_url, token, eid))
-    if args.verbose:
+    v = _st.verbose
+    if v:
         out(data, verbose=True)
     else:
         attrs = data.get("attributes", {})
@@ -499,416 +678,78 @@ def cmd_weather(args: argparse.Namespace) -> None:
         )
 
 
-# ---------------------------------------------------------------------------
-# Commands — generic entity control (any domain)
-# ---------------------------------------------------------------------------
+# -- Generic entity control --
 
 
-def _entity_service(
-    args: argparse.Namespace, service: str, extra: dict[str, Any] | None = None
+@app.command()
+def on(
+    entity_id: str,
+    brightness: int = typer.Option(None, help="Brightness 0-255 (lights)"),
+    transition: float = typer.Option(None, help="Transition seconds (lights)"),
 ) -> None:
+    """Turn on any entity."""
     base_url, token = load_config()
-    domain = args.entity_id.split(".", 1)[0]
-    payload: dict[str, Any] = {"entity_id": args.entity_id}
-    if extra:
-        payload.update(extra)
+    domain = entity_id.split(".", 1)[0]
+    payload: dict[str, Any] = {"entity_id": entity_id}
+    if brightness is not None:
+        payload["brightness"] = brightness
+    if transition is not None:
+        payload["transition"] = transition
+    result = safe_run(_call_service(base_url, token, domain, "turn_on", payload))
+    _done(result, entity_id, "turn_on")
+
+
+@app.command()
+def off(entity_id: str) -> None:
+    """Turn off any entity."""
+    base_url, token = load_config()
+    domain = entity_id.split(".", 1)[0]
+    result = safe_run(
+        _call_service(base_url, token, domain, "turn_off", {"entity_id": entity_id})
+    )
+    _done(result, entity_id, "turn_off")
+
+
+@app.command()
+def toggle(entity_id: str) -> None:
+    """Toggle any entity on/off."""
+    base_url, token = load_config()
+    domain = entity_id.split(".", 1)[0]
+    result = safe_run(
+        _call_service(base_url, token, domain, "toggle", {"entity_id": entity_id})
+    )
+    _done(result, entity_id, "toggle")
+
+
+@app.command()
+def call(
+    domain: str,
+    service: str,
+    json_payload: str = typer.Option(None, "--json", help="JSON payload"),
+) -> None:
+    """Raw service call."""
+    base_url, token = load_config()
+    payload: dict[str, Any] = json.loads(json_payload) if json_payload else {}
     result = safe_run(_call_service(base_url, token, domain, service, payload))
-    if args.verbose:
-        out(result, verbose=True)
-    else:
-        out({"ok": True, "entity_id": args.entity_id, "action": service})
-
-
-def cmd_on(args: argparse.Namespace) -> None:
-    extra: dict[str, Any] = {}
-    if args.brightness is not None:
-        extra["brightness"] = args.brightness
-    if args.transition is not None:
-        extra["transition"] = args.transition
-    _entity_service(args, "turn_on", extra)
-
-
-def cmd_off(args: argparse.Namespace) -> None:
-    _entity_service(args, "turn_off")
-
-
-def cmd_toggle(args: argparse.Namespace) -> None:
-    _entity_service(args, "toggle")
-
-
-def cmd_call(args: argparse.Namespace) -> None:
-    base_url, token = load_config()
-    payload: dict[str, Any] = json.loads(args.json) if args.json else {}
-    result = safe_run(
-        _call_service(base_url, token, args.domain, args.service, payload)
-    )
-    out(result, verbose=args.verbose)
-
-
-# ---------------------------------------------------------------------------
-# Commands — domain: light (singular=bulk action, plural=list)
-# ---------------------------------------------------------------------------
-
-
-def cmd_light(args: argparse.Namespace) -> None:
-    """ha light on|off [area]"""
-    base_url, token = load_config()
-    service = "turn_on" if args.action == "on" else "turn_off"
-    results = safe_run(_bulk_service(base_url, token, "light", service, args.area))
-    _bulk_result(results, service, "light", args.area, args.verbose)
-
-
-def cmd_lights(args: argparse.Namespace) -> None:
-    base_url, token = load_config()
-    states: list[dict[str, Any]] = safe_run(_get_states(base_url, token))
-    lights = _filter_domain_area(states, "light", args.area)
-    out(
-        lights if args.verbose else [slim(s, "light") for s in lights],
-        verbose=args.verbose,
-    )
-
-
-# ---------------------------------------------------------------------------
-# Commands — domain: cover
-# ---------------------------------------------------------------------------
-
-
-def cmd_cover(args: argparse.Namespace) -> None:
-    base_url, token = load_config()
-    eid = _prefix(args.entity_id, "cover")
-    if args.action == "position":
-        if args.value is None:
-            _die("cover position requires a value (0-100)")
-            return
-        result = safe_run(
-            _call_service(
-                base_url,
-                token,
-                "cover",
-                "set_cover_position",
-                {"entity_id": eid, "position": args.value},
-            )
-        )
-        out(
-            (
-                result
-                if args.verbose
-                else {"ok": True, "entity_id": eid, "position": args.value}
-            ),
-            verbose=args.verbose,
-        )
-        return
-    service_map = {"open": "open_cover", "close": "close_cover", "stop": "stop_cover"}
-    service = service_map[args.action]
-    result = safe_run(
-        _call_service(base_url, token, "cover", service, {"entity_id": eid})
-    )
-    out(
-        result if args.verbose else {"ok": True, "entity_id": eid, "action": service},
-        verbose=args.verbose,
-    )
-
-
-def cmd_covers(args: argparse.Namespace) -> None:
-    base_url, token = load_config()
-    states: list[dict[str, Any]] = safe_run(_get_states(base_url, token))
-    covers = _filter_domain_area(states, "cover", args.area)
-    out(
-        covers if args.verbose else [slim(s, "cover") for s in covers],
-        verbose=args.verbose,
-    )
-
-
-# ---------------------------------------------------------------------------
-# Commands — domain: lock
-# ---------------------------------------------------------------------------
-
-
-def cmd_lock(args: argparse.Namespace) -> None:
-    base_url, token = load_config()
-    eid = _prefix(args.entity_id, "lock")
-    result = safe_run(
-        _call_service(base_url, token, "lock", args.action, {"entity_id": eid})
-    )
-    out(
-        (
-            result
-            if args.verbose
-            else {"ok": True, "entity_id": eid, "action": args.action}
-        ),
-        verbose=args.verbose,
-    )
-
-
-def cmd_locks(args: argparse.Namespace) -> None:
-    base_url, token = load_config()
-    states: list[dict[str, Any]] = safe_run(_get_states(base_url, token))
-    locks = [s for s in states if s.get("entity_id", "").startswith("lock.")]
-    out(
-        locks if args.verbose else [slim(s, "lock") for s in locks],
-        verbose=args.verbose,
-    )
-
-
-# ---------------------------------------------------------------------------
-# Commands — domain: switch (list only — use ha on/off/toggle for control)
-# ---------------------------------------------------------------------------
-
-
-def cmd_switches(args: argparse.Namespace) -> None:
-    base_url, token = load_config()
-    states: list[dict[str, Any]] = safe_run(_get_states(base_url, token))
-    switches = _filter_domain_area(states, "switch", args.area)
-    out(switches if args.verbose else [slim(s) for s in switches], verbose=args.verbose)
-
-
-# ---------------------------------------------------------------------------
-# Commands — domain: media_player
-# ---------------------------------------------------------------------------
-
-
-def cmd_media(args: argparse.Namespace) -> None:
-    base_url, token = load_config()
-    eid = _prefix(args.entity_id, "media_player")
-    service_map = {
-        "play": "media_play",
-        "pause": "media_pause",
-        "stop": "media_stop",
-        "next": "media_next_track",
-        "prev": "media_previous_track",
-    }
-    service = service_map[args.action]
-    result = safe_run(
-        _call_service(base_url, token, "media_player", service, {"entity_id": eid})
-    )
-    out(
-        result if args.verbose else {"ok": True, "entity_id": eid, "action": service},
-        verbose=args.verbose,
-    )
-
-
-def cmd_volume(args: argparse.Namespace) -> None:
-    base_url, token = load_config()
-    eid = _prefix(args.entity_id, "media_player")
-    result = safe_run(
-        _call_service(
-            base_url,
-            token,
-            "media_player",
-            "volume_set",
-            {"entity_id": eid, "volume_level": args.level / 100.0},
-        )
-    )
-    out(
-        (
-            result
-            if args.verbose
-            else {"ok": True, "entity_id": eid, "volume": args.level}
-        ),
-        verbose=args.verbose,
-    )
-
-
-def cmd_players(args: argparse.Namespace) -> None:
-    base_url, token = load_config()
-    states: list[dict[str, Any]] = safe_run(_get_states(base_url, token))
-    players = [s for s in states if s.get("entity_id", "").startswith("media_player.")]
-    out(
-        players if args.verbose else [slim(s, "media_player") for s in players],
-        verbose=args.verbose,
-    )
-
-
-# ---------------------------------------------------------------------------
-# Commands — domain: fan
-# ---------------------------------------------------------------------------
-
-
-def cmd_fan(args: argparse.Namespace) -> None:
-    base_url, token = load_config()
-    eid = _prefix(args.entity_id, "fan")
-    action = args.action
-    if action == "speed":
-        if args.value is None:
-            _die("fan speed requires a value (0-100)")
-            return
-        result = safe_run(
-            _call_service(
-                base_url,
-                token,
-                "fan",
-                "set_percentage",
-                {"entity_id": eid, "percentage": args.value},
-            )
-        )
-        label = {"ok": True, "entity_id": eid, "percentage": args.value}
-    elif action == "preset":
-        if args.value is None:
-            _die("fan preset requires a mode name")
-            return
-        result = safe_run(
-            _call_service(
-                base_url,
-                token,
-                "fan",
-                "set_preset_mode",
-                {"entity_id": eid, "preset_mode": args.value},
-            )
-        )
-        label = {"ok": True, "entity_id": eid, "preset_mode": args.value}
-    elif action == "oscillate":
-        val = str(args.value).lower() in ("on", "true", "1")
-        result = safe_run(
-            _call_service(
-                base_url,
-                token,
-                "fan",
-                "oscillate",
-                {"entity_id": eid, "oscillating": val},
-            )
-        )
-        label = {"ok": True, "entity_id": eid, "oscillating": val}
-    else:
-        _die(f"Unknown fan action: {action}")
-        return
-    out(result if args.verbose else label, verbose=args.verbose)
-
-
-def cmd_fans(args: argparse.Namespace) -> None:
-    base_url, token = load_config()
-    states: list[dict[str, Any]] = safe_run(_get_states(base_url, token))
-    fans = [s for s in states if s.get("entity_id", "").startswith("fan.")]
-    out(fans if args.verbose else [slim(s) for s in fans], verbose=args.verbose)
-
-
-# ---------------------------------------------------------------------------
-# Commands — domain: climate
-# ---------------------------------------------------------------------------
-
-
-def cmd_climate(args: argparse.Namespace) -> None:
-    base_url, token = load_config()
-    payload: dict[str, Any] = {"entity_id": args.entity_id}
-    if args.temperature is not None:
-        payload["temperature"] = args.temperature
-    if args.hvac_mode:
-        payload["hvac_mode"] = args.hvac_mode
-    if "temperature" in payload:
-        service = "set_temperature"
-    elif "hvac_mode" in payload:
-        service = "set_hvac_mode"
-    else:
-        _die("Specify --temperature and/or --hvac-mode")
-        return
-    result = safe_run(_call_service(base_url, token, "climate", service, payload))
-    if args.verbose:
-        out(result, verbose=True)
-    else:
-        out(
-            {
-                "ok": True,
-                "entity_id": args.entity_id,
-                "action": service,
-                **{k: v for k, v in payload.items() if k != "entity_id"},
-            }
-        )
-
-
-# ---------------------------------------------------------------------------
-# Commands — domain: humidifier
-# ---------------------------------------------------------------------------
-
-
-def cmd_humidifier(args: argparse.Namespace) -> None:
-    base_url, token = load_config()
-    eid = _prefix(args.entity_id, "humidifier")
-    payload: dict[str, Any] = {"entity_id": eid}
-    if args.humidity is not None:
-        payload["humidity"] = args.humidity
-    if args.mode:
-        payload["mode"] = args.mode
-    if "humidity" in payload:
-        result = safe_run(
-            _call_service(base_url, token, "humidifier", "set_humidity", payload)
-        )
-        if args.mode:
-            safe_run(
-                _call_service(
-                    base_url,
-                    token,
-                    "humidifier",
-                    "set_mode",
-                    {"entity_id": eid, "mode": args.mode},
-                )
-            )
-    elif "mode" in payload:
-        result = safe_run(
-            _call_service(base_url, token, "humidifier", "set_mode", payload)
-        )
-    else:
-        _die("Specify --humidity and/or --mode")
-        return
-    if args.verbose:
-        out(result, verbose=True)
-    else:
-        out(
-            {
-                "ok": True,
-                "entity_id": eid,
-                **{k: v for k, v in payload.items() if k != "entity_id"},
-            }
-        )
-
-
-def cmd_humidifiers(args: argparse.Namespace) -> None:
-    base_url, token = load_config()
-    states: list[dict[str, Any]] = safe_run(_get_states(base_url, token))
-    humids = [s for s in states if s.get("entity_id", "").startswith("humidifier.")]
-    out(
-        humids if args.verbose else [slim(s, "humidifier") for s in humids],
-        verbose=args.verbose,
-    )
-
-
-# ---------------------------------------------------------------------------
-# Commands — scene, script (fuzzy), automation, assist, button
-# ---------------------------------------------------------------------------
-
-
-def cmd_scene(args: argparse.Namespace) -> None:
-    _fuzzy_run(args, "scene", "turn_on", "scene")
-
-
-def cmd_script(args: argparse.Namespace) -> None:
-    _fuzzy_run(args, "script", "turn_on", "script")
-
-
-def cmd_automation(args: argparse.Namespace) -> None:
-    base_url, token = load_config()
-    eid = _prefix(args.automation, "automation")
-    result = safe_run(
-        _call_service(base_url, token, "automation", args.action, {"entity_id": eid})
-    )
-    out(
-        (
-            result
-            if args.verbose
-            else {"ok": True, "entity_id": eid, "action": args.action}
-        ),
-        verbose=args.verbose,
-    )
-
-
-def cmd_assist(args: argparse.Namespace) -> None:
+    out(result, verbose=_st.verbose)
+
+
+@app.command()
+def assist(
+    text: str,
+    language: str = typer.Option("en", help="Language code"),
+) -> None:
+    """Natural language command via HA Assist API."""
     base_url, token = load_config()
     result = _rest(
         base_url,
         token,
         "POST",
         "/api/conversation/process",
-        {"text": args.text, "language": args.language},
+        {"text": text, "language": language},
     )
-    if args.verbose:
+    v = _st.verbose
+    if v:
         out(result, verbose=True)
     elif isinstance(result, dict):
         speech = (
@@ -922,212 +763,579 @@ def cmd_assist(args: argparse.Namespace) -> None:
         out(result)
 
 
-def cmd_button(args: argparse.Namespace) -> None:
+@app.command()
+def scene(
+    name: str = typer.Argument(None, help="Scene name (fuzzy) — omit to list"),
+) -> None:
+    """Activate a scene, or list all scenes."""
     base_url, token = load_config()
-    eid = _prefix(args.entity_id, "button")
+    states = safe_run(_get_states(base_url, token))
+    if name is None:
+        scenes = _filter_domain_area(states, "scene", None)
+        v = _st.verbose
+        out(
+            {
+                "entities": scenes if v else [slim(s) for s in scenes],
+                "actions": DOMAIN_ACTIONS["scene"],
+            },
+            verbose=v,
+        )
+        return
+    eid = _fuzzy_find(states, "scene", name)
+    if not eid:
+        return
+    result = safe_run(
+        _call_service(base_url, token, "scene", "turn_on", {"entity_id": eid})
+    )
+    _done(result, eid, "turn_on")
+
+
+@app.command()
+def script(
+    name: str = typer.Argument(None, help="Script name (fuzzy) — omit to list"),
+) -> None:
+    """Run a script, or list all scripts."""
+    base_url, token = load_config()
+    states = safe_run(_get_states(base_url, token))
+    if name is None:
+        scripts = _filter_domain_area(states, "script", None)
+        v = _st.verbose
+        out(
+            {
+                "entities": scripts if v else [slim(s) for s in scripts],
+                "actions": DOMAIN_ACTIONS["script"],
+            },
+            verbose=v,
+        )
+        return
+    eid = _fuzzy_find(states, "script", name)
+    if not eid:
+        return
+    result = safe_run(
+        _call_service(base_url, token, "script", "turn_on", {"entity_id": eid})
+    )
+    _done(result, eid, "turn_on")
+
+
+@app.command()
+def button(
+    entity_id: str = typer.Argument(None, help="button.x or x — omit to list"),
+) -> None:
+    """Press a button entity, or list all buttons."""
+    if entity_id is None:
+        _list_domain("button", None, DOMAIN_ACTIONS["button"])
+        return
+    base_url, token = load_config()
+    eid = _prefix(entity_id, "button")
     result = safe_run(
         _call_service(base_url, token, "button", "press", {"entity_id": eid})
     )
-    out(
-        result if args.verbose else {"ok": True, "entity_id": eid, "action": "press"},
-        verbose=args.verbose,
-    )
+    _done(result, eid, "press")
 
 
 # ---------------------------------------------------------------------------
-# Parser
+# Domain: light
+# ---------------------------------------------------------------------------
+
+light_app = typer.Typer(
+    help="Light control — list or bulk on/off by area.",
+    invoke_without_command=True,
+    no_args_is_help=False,
+)
+app.add_typer(light_app, name="light")
+
+
+@light_app.callback(invoke_without_command=True)
+def _light_list(
+    ctx: typer.Context,
+    area: str = typer.Option(None, help="Filter by area"),
+) -> None:
+    """List all lights and available actions."""
+    if ctx.invoked_subcommand is not None:
+        return
+    _list_domain("light", area, DOMAIN_ACTIONS["light"])
+
+
+@light_app.command("on")
+def light_on(
+    area: str = typer.Argument(None, help="Area name"),
+) -> None:
+    """Turn on all lights (or by area)."""
+    base_url, token = load_config()
+    results = safe_run(_bulk_service(base_url, token, "light", "turn_on", area))
+    _bulk_done(results, "turn_on", "light", area)
+
+
+@light_app.command("off")
+def light_off(
+    area: str = typer.Argument(None, help="Area name"),
+) -> None:
+    """Turn off all lights (or by area)."""
+    base_url, token = load_config()
+    results = safe_run(_bulk_service(base_url, token, "light", "turn_off", area))
+    _bulk_done(results, "turn_off", "light", area)
+
+
+# ---------------------------------------------------------------------------
+# Domain: fan
+# ---------------------------------------------------------------------------
+
+fan_app = typer.Typer(
+    help="Fan control — list or set speed/preset/oscillate.",
+    invoke_without_command=True,
+    no_args_is_help=False,
+)
+app.add_typer(fan_app, name="fan")
+
+
+@fan_app.callback(invoke_without_command=True)
+def _fan_list(ctx: typer.Context) -> None:
+    """List all fans and available controls."""
+    if ctx.invoked_subcommand is not None:
+        return
+    _list_domain("fan", None, DOMAIN_ACTIONS["fan"])
+
+
+@fan_app.command()
+def speed(
+    entity_id: str,
+    value: int = typer.Argument(..., help="Speed percentage 0-100"),
+) -> None:
+    """Set fan speed percentage."""
+    base_url, token = load_config()
+    eid = _prefix(entity_id, "fan")
+    result = safe_run(
+        _call_service(
+            base_url,
+            token,
+            "fan",
+            "set_percentage",
+            {"entity_id": eid, "percentage": value},
+        )
+    )
+    _done(result, eid, "set_percentage", percentage=value)
+
+
+@fan_app.command()
+def preset(entity_id: str, mode: str) -> None:
+    """Set fan preset mode."""
+    base_url, token = load_config()
+    eid = _prefix(entity_id, "fan")
+    result = safe_run(
+        _call_service(
+            base_url,
+            token,
+            "fan",
+            "set_preset_mode",
+            {"entity_id": eid, "preset_mode": mode},
+        )
+    )
+    _done(result, eid, "set_preset_mode", preset_mode=mode)
+
+
+@fan_app.command()
+def oscillate(
+    entity_id: str,
+    value: str = typer.Argument(..., help="on or off"),
+) -> None:
+    """Toggle fan oscillation."""
+    base_url, token = load_config()
+    eid = _prefix(entity_id, "fan")
+    val = value.lower() in ("on", "true", "1")
+    result = safe_run(
+        _call_service(
+            base_url,
+            token,
+            "fan",
+            "oscillate",
+            {"entity_id": eid, "oscillating": val},
+        )
+    )
+    _done(result, eid, "oscillate", oscillating=val)
+
+
+# ---------------------------------------------------------------------------
+# Domain: cover
+# ---------------------------------------------------------------------------
+
+cover_app = typer.Typer(
+    help="Cover control — open/close/stop/position.",
+    invoke_without_command=True,
+    no_args_is_help=False,
+)
+app.add_typer(cover_app, name="cover")
+
+
+@cover_app.callback(invoke_without_command=True)
+def _cover_list(
+    ctx: typer.Context,
+    area: str = typer.Option(None, help="Filter by area"),
+) -> None:
+    """List all covers and available actions."""
+    if ctx.invoked_subcommand is not None:
+        return
+    _list_domain("cover", area, DOMAIN_ACTIONS["cover"])
+
+
+@cover_app.command("open")
+def cover_open(entity_id: str) -> None:
+    """Open a cover."""
+    base_url, token = load_config()
+    eid = _prefix(entity_id, "cover")
+    result = safe_run(
+        _call_service(base_url, token, "cover", "open_cover", {"entity_id": eid})
+    )
+    _done(result, eid, "open_cover")
+
+
+@cover_app.command("close")
+def cover_close(entity_id: str) -> None:
+    """Close a cover."""
+    base_url, token = load_config()
+    eid = _prefix(entity_id, "cover")
+    result = safe_run(
+        _call_service(base_url, token, "cover", "close_cover", {"entity_id": eid})
+    )
+    _done(result, eid, "close_cover")
+
+
+@cover_app.command("stop")
+def cover_stop(entity_id: str) -> None:
+    """Stop cover movement."""
+    base_url, token = load_config()
+    eid = _prefix(entity_id, "cover")
+    result = safe_run(
+        _call_service(base_url, token, "cover", "stop_cover", {"entity_id": eid})
+    )
+    _done(result, eid, "stop_cover")
+
+
+@cover_app.command()
+def position(
+    entity_id: str,
+    value: int = typer.Argument(..., help="Position 0=closed, 100=open"),
+) -> None:
+    """Set cover position."""
+    base_url, token = load_config()
+    eid = _prefix(entity_id, "cover")
+    result = safe_run(
+        _call_service(
+            base_url,
+            token,
+            "cover",
+            "set_cover_position",
+            {"entity_id": eid, "position": value},
+        )
+    )
+    _done(result, eid, "set_cover_position", position=value)
+
+
+# ---------------------------------------------------------------------------
+# Domain: lock
+# ---------------------------------------------------------------------------
+
+lock_app = typer.Typer(
+    help="Lock control.",
+    invoke_without_command=True,
+    no_args_is_help=False,
+)
+app.add_typer(lock_app, name="lock")
+
+
+@lock_app.callback(invoke_without_command=True)
+def _lock_list(ctx: typer.Context) -> None:
+    """List all locks and available actions."""
+    if ctx.invoked_subcommand is not None:
+        return
+    _list_domain("lock", None, DOMAIN_ACTIONS["lock"])
+
+
+@lock_app.command("lock")
+def lock_lock(entity_id: str) -> None:
+    """Lock a lock."""
+    base_url, token = load_config()
+    eid = _prefix(entity_id, "lock")
+    result = safe_run(
+        _call_service(base_url, token, "lock", "lock", {"entity_id": eid})
+    )
+    _done(result, eid, "lock")
+
+
+@lock_app.command("unlock")
+def lock_unlock(entity_id: str) -> None:
+    """Unlock a lock."""
+    base_url, token = load_config()
+    eid = _prefix(entity_id, "lock")
+    result = safe_run(
+        _call_service(base_url, token, "lock", "unlock", {"entity_id": eid})
+    )
+    _done(result, eid, "unlock")
+
+
+# ---------------------------------------------------------------------------
+# Domain: switch
 # ---------------------------------------------------------------------------
 
 
-def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(
-        prog="ha", description="Home Assistant CLI (compact output by default)"
+@app.command("switch")
+def switch_list(
+    area: str = typer.Argument(None, help="Filter by area"),
+) -> None:
+    """List switches. Use `ha on/off/toggle <entity_id>` to control."""
+    _list_domain("switch", area, DOMAIN_ACTIONS["switch"])
+
+
+# ---------------------------------------------------------------------------
+# Domain: media
+# ---------------------------------------------------------------------------
+
+media_app = typer.Typer(
+    help="Media player control — play/pause/stop/next/prev/volume.",
+    invoke_without_command=True,
+    no_args_is_help=False,
+)
+app.add_typer(media_app, name="media")
+
+
+@media_app.callback(invoke_without_command=True)
+def _media_list(ctx: typer.Context) -> None:
+    """List all media players and available controls."""
+    if ctx.invoked_subcommand is not None:
+        return
+    _list_domain("media_player", None, DOMAIN_ACTIONS["media_player"])
+
+
+def _media_action(entity_id: str, service: str) -> None:
+    base_url, token = load_config()
+    eid = _prefix(entity_id, "media_player")
+    result = safe_run(
+        _call_service(base_url, token, "media_player", service, {"entity_id": eid})
     )
-    p.add_argument("-v", "--verbose", action="store_true", help="Full JSON output")
-    sub = p.add_subparsers(dest="command", required=True)
+    _done(result, eid, service)
 
-    # -- Query / inspect --
-    sub.add_parser("info", help="Connection info")
 
-    e = sub.add_parser("entities", help="List entities")
-    e.add_argument("--domain", help="Filter by domain (light, switch, ...)")
-    e.add_argument("--ids-only", action="store_true")
+@media_app.command()
+def play(entity_id: str) -> None:
+    """Play."""
+    _media_action(entity_id, "media_play")
 
-    s = sub.add_parser("search", help="Search entities by id/name")
-    s.add_argument("query")
 
-    st = sub.add_parser("state", help="Get entity state")
-    st.add_argument("entity_id")
+@media_app.command()
+def pause(entity_id: str) -> None:
+    """Pause."""
+    _media_action(entity_id, "media_pause")
 
-    sub.add_parser("areas", help="List all HA areas")
 
-    hi = sub.add_parser("history", help="Last N state changes for an entity")
-    hi.add_argument("entity_id")
-    hi.add_argument(
-        "-n", "--count", type=int, default=10, help="Number of entries (default 10)"
+@media_app.command("stop")
+def media_stop(entity_id: str) -> None:
+    """Stop playback."""
+    _media_action(entity_id, "media_stop")
+
+
+@media_app.command("next")
+def media_next(entity_id: str) -> None:
+    """Next track."""
+    _media_action(entity_id, "media_next_track")
+
+
+@media_app.command()
+def prev(entity_id: str) -> None:
+    """Previous track."""
+    _media_action(entity_id, "media_previous_track")
+
+
+@media_app.command()
+def volume(
+    entity_id: str,
+    level: int = typer.Argument(..., help="Volume 0-100"),
+) -> None:
+    """Set volume (0-100)."""
+    base_url, token = load_config()
+    eid = _prefix(entity_id, "media_player")
+    result = safe_run(
+        _call_service(
+            base_url,
+            token,
+            "media_player",
+            "volume_set",
+            {"entity_id": eid, "volume_level": level / 100.0},
+        )
     )
-    hi.add_argument(
-        "--hours", type=int, default=24, help="Look-back window in hours (default 24)"
-    )
+    _done(result, eid, "volume_set", volume=level)
 
-    sn = sub.add_parser("snapshot", help="Current state of key domains")
-    sn.add_argument(
-        "--domains",
-        help="Comma-separated (default: light,climate,media_player,fan,cover,lock)",
-    )
 
-    wt = sub.add_parser("weather", help="Current weather conditions")
-    wt.add_argument(
-        "entity_id", nargs="?", help="weather.x (default: weather.forecast_home)"
-    )
+# ---------------------------------------------------------------------------
+# Domain: climate
+# ---------------------------------------------------------------------------
 
-    # -- Generic entity control --
-    on = sub.add_parser("on", help="Turn on entity")
-    on.add_argument("entity_id")
-    on.add_argument("--brightness", type=int, help="0-255")
-    on.add_argument("--transition", type=float, help="Seconds")
+climate_app = typer.Typer(
+    help="Climate/AC control.",
+    invoke_without_command=True,
+    no_args_is_help=False,
+)
+app.add_typer(climate_app, name="climate")
 
-    off = sub.add_parser("off", help="Turn off entity")
-    off.add_argument("entity_id")
 
-    tg = sub.add_parser("toggle", help="Toggle entity")
-    tg.add_argument("entity_id")
+@climate_app.callback(invoke_without_command=True)
+def _climate_list(ctx: typer.Context) -> None:
+    """List all climate entities and available controls."""
+    if ctx.invoked_subcommand is not None:
+        return
+    _list_domain("climate", None, DOMAIN_ACTIONS["climate"])
 
-    c = sub.add_parser("call", help="Raw service call")
-    c.add_argument("domain")
-    c.add_argument("service")
-    c.add_argument("--json", help="JSON payload")
 
-    # -- Light (singular=bulk action, plural=list) --
-    lt = sub.add_parser("light", help="Bulk light control by area")
-    lt.add_argument("action", choices=["on", "off"])
-    lt.add_argument("area", nargs="?", help="Area name (bedroom, hall, kitchen, ...)")
-
-    ll = sub.add_parser("lights", help="List lights (or by area)")
-    ll.add_argument("area", nargs="?", help="Area name")
-
-    # -- Cover --
-    cv = sub.add_parser("cover", help="Cover control (open/close/stop/position)")
-    cv.add_argument("action", choices=["open", "close", "stop", "position"])
-    cv.add_argument("entity_id", help="cover.x or x")
-    cv.add_argument("value", nargs="?", type=int, help="Position 0-100 (for position)")
-
-    cvl = sub.add_parser("covers", help="List covers (or by area)")
-    cvl.add_argument("area", nargs="?", help="Area name")
-
-    # -- Lock --
-    lk = sub.add_parser("lock", help="Lock/unlock")
-    lk.add_argument("action", choices=["lock", "unlock"])
-    lk.add_argument("entity_id", help="lock.x or x")
-
-    sub.add_parser("locks", help="List all locks")
-
-    # -- Switch --
-    sw = sub.add_parser("switches", help="List switches (or by area)")
-    sw.add_argument("area", nargs="?", help="Area name")
-
-    # -- Media player --
-    md = sub.add_parser("media", help="Media control (play/pause/stop/next/prev)")
-    md.add_argument("action", choices=["play", "pause", "stop", "next", "prev"])
-    md.add_argument("entity_id", help="media_player.x or x")
-
-    vol = sub.add_parser("volume", help="Set media player volume (0-100)")
-    vol.add_argument("entity_id", help="media_player.x or x")
-    vol.add_argument("level", type=int, help="Volume 0-100")
-
-    sub.add_parser("players", help="List all media players")
-
-    # -- Fan --
-    fn = sub.add_parser("fan", help="Fan control (speed/preset/oscillate)")
-    fn.add_argument("action", choices=["speed", "preset", "oscillate"])
-    fn.add_argument("entity_id", help="fan.x or x")
-    fn.add_argument("value", nargs="?", help="Speed 0-100, preset name, or on/off")
-
-    sub.add_parser("fans", help="List all fans")
-
-    # -- Climate --
-    cl = sub.add_parser("climate", help="Climate control")
-    cl.add_argument("entity_id")
-    cl.add_argument("--temperature", type=float)
-    cl.add_argument(
+@climate_app.command("set")
+def climate_set(
+    entity_id: str,
+    temperature: float = typer.Option(None, help="Target temperature"),
+    hvac_mode: str = typer.Option(
+        None,
         "--hvac-mode",
-        choices=["off", "heat", "cool", "heat_cool", "auto", "dry", "fan_only"],
+        help="off|heat|cool|heat_cool|auto|dry|fan_only",
+    ),
+) -> None:
+    """Set climate temperature and/or HVAC mode."""
+    base_url, token = load_config()
+    payload: dict[str, Any] = {"entity_id": entity_id}
+    if temperature is not None:
+        payload["temperature"] = temperature
+    if hvac_mode:
+        payload["hvac_mode"] = hvac_mode
+    if "temperature" in payload:
+        service = "set_temperature"
+    elif "hvac_mode" in payload:
+        service = "set_hvac_mode"
+    else:
+        _die("Specify --temperature and/or --hvac-mode")
+        return
+    result = safe_run(_call_service(base_url, token, "climate", service, payload))
+    _done(
+        result,
+        entity_id,
+        service,
+        **{k: v for k, v in payload.items() if k != "entity_id"},
     )
 
-    # -- Humidifier --
-    hm = sub.add_parser("humidifier", help="Set humidifier target humidity or mode")
-    hm.add_argument("entity_id", help="humidifier.x or x")
-    hm.add_argument("--humidity", type=int, help="Target humidity 0-100")
-    hm.add_argument("--mode", help="Mode (SMART, FAST, CILENT, IONIZER, ...)")
 
-    sub.add_parser("humidifiers", help="List all humidifiers/dehumidifiers")
+# ---------------------------------------------------------------------------
+# Domain: humidifier
+# ---------------------------------------------------------------------------
 
-    # -- Scene / script / automation / assist / button --
-    sc = sub.add_parser("scene", help="Activate scene (fuzzy match)")
-    sc.add_argument("scene", help="scene.x or x or substring")
-
-    sr = sub.add_parser("script", help="Run script (fuzzy match)")
-    sr.add_argument("script", help="script.x or x or substring")
-
-    au = sub.add_parser("automation", help="Trigger/enable/disable automation")
-    au.add_argument("action", choices=["trigger", "turn_on", "turn_off"])
-    au.add_argument("automation", help="automation.x or x")
-
-    a = sub.add_parser("assist", help="Natural language via Assist API")
-    a.add_argument("text")
-    a.add_argument("--language", default="en")
-
-    bt = sub.add_parser("button", help="Press a button entity")
-    bt.add_argument("entity_id", help="button.x or x")
-
-    return p
+humidifier_app = typer.Typer(
+    help="Humidifier/dehumidifier control.",
+    invoke_without_command=True,
+    no_args_is_help=False,
+)
+app.add_typer(humidifier_app, name="humidifier")
 
 
-COMMANDS = {
-    "info": cmd_info,
-    "entities": cmd_entities,
-    "search": cmd_search,
-    "state": cmd_state,
-    "areas": cmd_areas,
-    "history": cmd_history,
-    "snapshot": cmd_snapshot,
-    "weather": cmd_weather,
-    "on": cmd_on,
-    "off": cmd_off,
-    "toggle": cmd_toggle,
-    "call": cmd_call,
-    "light": cmd_light,
-    "lights": cmd_lights,
-    "cover": cmd_cover,
-    "covers": cmd_covers,
-    "lock": cmd_lock,
-    "locks": cmd_locks,
-    "switches": cmd_switches,
-    "media": cmd_media,
-    "volume": cmd_volume,
-    "players": cmd_players,
-    "fan": cmd_fan,
-    "fans": cmd_fans,
-    "climate": cmd_climate,
-    "humidifier": cmd_humidifier,
-    "humidifiers": cmd_humidifiers,
-    "scene": cmd_scene,
-    "script": cmd_script,
-    "automation": cmd_automation,
-    "assist": cmd_assist,
-    "button": cmd_button,
-}
+@humidifier_app.callback(invoke_without_command=True)
+def _humidifier_list(ctx: typer.Context) -> None:
+    """List all humidifiers and available controls."""
+    if ctx.invoked_subcommand is not None:
+        return
+    _list_domain("humidifier", None, DOMAIN_ACTIONS["humidifier"])
 
 
-def main() -> None:
-    parser = build_parser()
-    args = parser.parse_args()
-    handler = COMMANDS.get(args.command)
-    if handler:
-        handler(args)
+@humidifier_app.command("set")
+def humidifier_set(
+    entity_id: str,
+    humidity: int = typer.Option(None, help="Target humidity 0-100"),
+    mode: str = typer.Option(None, help="Mode (SMART, FAST, CILENT, IONIZER, ...)"),
+) -> None:
+    """Set humidifier target humidity and/or mode."""
+    base_url, token = load_config()
+    eid = _prefix(entity_id, "humidifier")
+    payload: dict[str, Any] = {"entity_id": eid}
+    if humidity is not None:
+        payload["humidity"] = humidity
+    if mode:
+        payload["mode"] = mode
+    if "humidity" in payload:
+        result = safe_run(
+            _call_service(base_url, token, "humidifier", "set_humidity", payload)
+        )
+        if mode:
+            safe_run(
+                _call_service(
+                    base_url,
+                    token,
+                    "humidifier",
+                    "set_mode",
+                    {"entity_id": eid, "mode": mode},
+                )
+            )
+    elif "mode" in payload:
+        result = safe_run(
+            _call_service(base_url, token, "humidifier", "set_mode", payload)
+        )
     else:
-        parser.print_help()
+        _die("Specify --humidity and/or --mode")
+        return
+    _done(
+        result,
+        eid,
+        "set",
+        **{k: v for k, v in payload.items() if k != "entity_id"},
+    )
 
+
+# ---------------------------------------------------------------------------
+# Domain: automation
+# ---------------------------------------------------------------------------
+
+auto_app = typer.Typer(
+    help="Automation control — trigger/enable/disable.",
+    invoke_without_command=True,
+    no_args_is_help=False,
+)
+app.add_typer(auto_app, name="automation")
+
+
+@auto_app.callback(invoke_without_command=True)
+def _auto_list(ctx: typer.Context) -> None:
+    """List all automations and available controls."""
+    if ctx.invoked_subcommand is not None:
+        return
+    _list_domain("automation", None, DOMAIN_ACTIONS["automation"])
+
+
+@auto_app.command()
+def trigger(entity_id: str) -> None:
+    """Trigger an automation."""
+    base_url, token = load_config()
+    eid = _prefix(entity_id, "automation")
+    result = safe_run(
+        _call_service(base_url, token, "automation", "trigger", {"entity_id": eid})
+    )
+    _done(result, eid, "trigger")
+
+
+@auto_app.command("on")
+def auto_on(entity_id: str) -> None:
+    """Enable an automation."""
+    base_url, token = load_config()
+    eid = _prefix(entity_id, "automation")
+    result = safe_run(
+        _call_service(base_url, token, "automation", "turn_on", {"entity_id": eid})
+    )
+    _done(result, eid, "turn_on")
+
+
+@auto_app.command("off")
+def auto_off(entity_id: str) -> None:
+    """Disable an automation."""
+    base_url, token = load_config()
+    eid = _prefix(entity_id, "automation")
+    result = safe_run(
+        _call_service(base_url, token, "automation", "turn_off", {"entity_id": eid})
+    )
+    _done(result, eid, "turn_off")
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    main()
+    app()

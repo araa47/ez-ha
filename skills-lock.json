@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "ez-ha": {
+      "source": "araa47/ez-ha",
+      "sourceType": "github",
+      "computedHash": "220a9a6fc3c57d3b33eed94294d383bcd1b32ab6140c6f6686faca811aea099b"
+    }
+  }
+}
