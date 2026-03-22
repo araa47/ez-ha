@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.7
+
+- **Fix:** Claude Code auth (OAuth login) no longer lost on addon restart — set `CLAUDE_CONFIG_DIR=/data/claude-config` so credentials are written directly to persistent storage instead of relying on `$HOME` resolving to the symlinked path. Also export `HOME=/root` explicitly for consistency.
+
 ## 0.0.6
 
 - **Fix:** `ha` CLI 401 Unauthorized — `SUPERVISOR_TOKEN` only works via the Supervisor proxy, not direct to `http://homeassistant:8123`. Changed `HA_URL` from `http://homeassistant:8123` to `http://supervisor/core` so API calls go through the Supervisor proxy where the token is valid.

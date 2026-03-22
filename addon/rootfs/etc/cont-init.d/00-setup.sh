@@ -3,6 +3,10 @@
 
 # ---------------------------------------------------------------------------
 # Persist Claude Code config (auth, settings) across container restarts
+#
+# Claude Code stores credentials at $CLAUDE_CONFIG_DIR/.credentials.json
+# (plaintext file on Linux, keychain on macOS). By pointing CLAUDE_CONFIG_DIR
+# at /data (which HA addons persist), auth survives addon restarts.
 # ---------------------------------------------------------------------------
 mkdir -p /data/claude-config
 # If .claude exists as a real dir (not symlink), migrate contents to persistent storage
@@ -17,6 +21,8 @@ ln -sf /data/claude-config /root/.claude
 # Build /etc/profile.d/ha-env.sh (overwrite each start — do NOT append)
 # ---------------------------------------------------------------------------
 cat > /etc/profile.d/ha-env.sh <<ENVEOF
+export HOME=/root
+export CLAUDE_CONFIG_DIR=/data/claude-config
 export HA_URL=http://supervisor/core
 export HA_TOKEN=${SUPERVISOR_TOKEN}
 export SUPERVISOR_TOKEN=${SUPERVISOR_TOKEN}
