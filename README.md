@@ -1,19 +1,19 @@
 <p align="center">
-  <h1 align="center">ez-ha</h1>
-  <p align="center">
-    <strong>Home Assistant, meet your AI agent.</strong>
-  </p>
-  <p align="center">
-    <a href="#ez-ha--the-skill">Skill</a> &bull;
-    <a href="#ez-ha--the-addon">Addon</a> &bull;
-    <a href="https://github.com/araa47/ez-ha/issues">Issues</a> &bull;
-    <a href="CONTRIBUTING.md">Contributing</a>
-  </p>
-  <p align="center">
-    <a href="https://github.com/araa47/ez-ha/actions"><img src="https://img.shields.io/github/actions/workflow/status/araa47/ez-ha/on-pr.yml?branch=main&style=flat-square" alt="CI"></a>
-    <a href="https://github.com/araa47/ez-ha/blob/main/LICENSE"><img src="https://img.shields.io/github/license/araa47/ez-ha?style=flat-square" alt="License"></a>
-    <a href="https://github.com/araa47/ez-ha/stargazers"><img src="https://img.shields.io/github/stars/araa47/ez-ha?style=flat-square" alt="Stars"></a>
-  </p>
+  <img src="ez-ha.png" alt="ez-ha logo" width="400">
+</p>
+<p align="center">
+  <strong>Home Assistant, meet your AI agent.</strong>
+</p>
+<p align="center">
+  <a href="#ez-ha--the-skill">Skill</a> &bull;
+  <a href="#ez-ha--the-addon">Addon</a> &bull;
+  <a href="https://github.com/araa47/ez-ha/issues">Issues</a> &bull;
+  <a href="CONTRIBUTING.md">Contributing</a>
+</p>
+<p align="center">
+  <a href="https://github.com/araa47/ez-ha/actions"><img src="https://img.shields.io/github/actions/workflow/status/araa47/ez-ha/on-pr.yml?branch=main&style=flat-square" alt="CI"></a>
+  <a href="https://github.com/araa47/ez-ha/blob/main/LICENSE"><img src="https://img.shields.io/github/license/araa47/ez-ha?style=flat-square" alt="License"></a>
+  <a href="https://github.com/araa47/ez-ha/stargazers"><img src="https://img.shields.io/github/stars/araa47/ez-ha?style=flat-square" alt="Stars"></a>
 </p>
 
 ---
