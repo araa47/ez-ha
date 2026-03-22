@@ -32,11 +32,15 @@ RUN apk add --no-cache \
     && pip3 install --no-cache-dir --no-compile --break-system-packages \
        homeassistant-api python-dotenv typer \
     && apk del .pip \
-    # Download ha.py skill
+    # Download skill scripts
     && curl -fsSL \
        "https://raw.githubusercontent.com/araa47/ez-ha/main/skills/ez-ha/scripts/ha.py" \
        -o /usr/local/bin/ha \
     && chmod +x /usr/local/bin/ha \
+    && mkdir -p /usr/local/lib/ez-ui \
+    && curl -fsSL \
+       "https://raw.githubusercontent.com/araa47/ez-ha/main/skills/ez-ui/scripts/browser-login.mjs" \
+       -o /usr/local/lib/ez-ui/browser-login.mjs \
     # Cleanup
     && rm -rf /tmp/* /root/.cache /root/.npm /var/cache/apk/*
 
