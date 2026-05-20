@@ -5,7 +5,7 @@ description = "Python UV Boilerplate contains all the boilerplate you need to cr
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "homeassistant-api>=5.0.3",
+    "homeassistant-api>=6.0.0",
     "python-dotenv>=1.2.2",
     "typer>=0.24.1",
 ]
