@@ -2,9 +2,10 @@
 # /// script
 # requires-python = ">=3.12"
 # dependencies = [
-#   "HomeAssistant-API>=5.0.3",
+#   "HomeAssistant-API>=6.0.0",
 #   "python-dotenv>=1.0.1",
 #   "typer>=0.12.0",
+#   "niquests[socks]>=3.0",
 # ]
 # ///
 """Home Assistant CLI — agent-friendly, compact by default.
@@ -23,7 +24,7 @@ from typing import Any
 
 import typer
 from dotenv import load_dotenv
-from homeassistant_api import Client as HAClient
+from homeassistant_api import AsyncClient as HAClient
 
 # ---------------------------------------------------------------------------
 # App
@@ -241,7 +242,7 @@ def safe_run(coro: Any) -> Any:
 
 
 async def get_client(base_url: str, token: str) -> HAClient:
-    return HAClient(f"{base_url}/api", token, use_async=True)
+    return HAClient(f"{base_url}/api", token)
 
 
 async def _call_service(
@@ -253,26 +254,26 @@ async def _call_service(
 ) -> Any:
     client = await get_client(base_url, token)
     async with client:
-        result = await client.async_trigger_service(domain, service, **data)
+        result = await client.trigger_service(domain, service, **data)
         return normalize(result)
 
 
 async def _get_states(base_url: str, token: str) -> list[dict[str, Any]]:
     client = await get_client(base_url, token)
     async with client:
-        return normalize(await client.async_get_states())
+        return normalize(await client.get_states())
 
 
 async def _get_state(base_url: str, token: str, entity_id: str) -> dict[str, Any]:
     client = await get_client(base_url, token)
     async with client:
-        return normalize(await client.async_get_state(entity_id=entity_id))
+        return normalize(await client.get_state(entity_id=entity_id))
 
 
 async def _get_config(base_url: str, token: str) -> dict[str, Any]:
     client = await get_client(base_url, token)
     async with client:
-        return normalize(await client.async_get_config())
+        return normalize(await client.get_config())
 
 
 def _rest(
@@ -440,13 +441,13 @@ async def _bulk_service(
 ) -> list[dict[str, Any]]:
     client = await get_client(base_url, token)
     async with client:
-        states = normalize(await client.async_get_states())
+        states = normalize(await client.get_states())
         targets = _filter_domain_area(states, domain, area)
         results = []
         for entity in targets:
             eid = entity.get("entity_id", "")
             try:
-                await client.async_trigger_service(domain, service, entity_id=eid)
+                await client.trigger_service(domain, service, entity_id=eid)
                 results.append({"entity_id": eid, "ok": True})
             except Exception as e:
                 results.append({"entity_id": eid, "ok": False, "error": str(e)})
