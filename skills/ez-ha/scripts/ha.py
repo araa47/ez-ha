@@ -2,9 +2,9 @@
 # /// script
 # requires-python = ">=3.12"
 # dependencies = [
-#   "HomeAssistant-API>=6.0.0",
-#   "python-dotenv>=1.0.1",
-#   "typer>=0.12.0",
+#   "HomeAssistant-API>=6.1.0",
+#   "python-dotenv>=1.2.4",
+#   "typer>=0.27.3",
 #   "niquests[socks]>=3.0",
 # ]
 # ///

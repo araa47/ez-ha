@@ -7,13 +7,15 @@ on:
 jobs:
     prek:
         runs-on: ubuntu-latest
+        permissions:
+            contents: read
         env:
             PIP_DISABLE_PIP_VERSION_CHECK: 1
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
 
             - name: Install uv
-              uses: astral-sh/setup-uv@v5
+              uses: astral-sh/setup-uv@v10.3.3
               with:
                   version: latest
                   enable-cache: true
@@ -25,7 +27,7 @@ jobs:
             - name: Install the project
               run: uv sync --all-extras --dev
 
-            - uses: actions/cache@v4
+            - uses: actions/cache@v6
               with:
                   path: ~/.cache/prek
                   key: prek-3|${{ env.pythonLocation }}|${{ hashFiles('.pre-commit-config.yaml') }}
