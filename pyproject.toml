@@ -5,19 +5,19 @@ description = "Python UV Boilerplate contains all the boilerplate you need to cr
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "homeassistant-api>=6.0.0",
-    "python-dotenv>=1.2.2",
-    "typer>=0.24.1",
+    "homeassistant-api>=6.1.0",
+    "python-dotenv>=1.2.4",
+    "typer>=0.27.3",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "ruff>=0.15.4",
-    "prek>=0.3.4",
-    "pytest",
-    "pytest-asyncio>=1.3.0",
-    "pytest-cov",
-    "ty>=0.0.19",
+    "ruff>=0.17.3",
+    "prek>=0.5.9",
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.4.1",
+    "pytest-cov>=7.1.0",
+    "ty>=0.0.95",
 ]
 
 [tool.pytest.ini_options]
@@ -33,6 +33,8 @@ include_trailing_comma = true
 multi_line_output = 3
 
 [tool.ruff]
-select = ["E", "F", "B"]
 exclude = ["__pycache__", "terraform", ".git", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "B"]
 ignore = ["E501"]
